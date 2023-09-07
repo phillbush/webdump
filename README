@@ -1,14 +1,3 @@
-!!!
-
-NOTE! work-in-progress (very slowly) and experimental.
-
-This code has many dirty hacks and ugliness. Intended for my personal use only.
-Knowing this: of course feel free to use it in any way you like, see the
-LICENSE.
-
-!!!
-
-
 webdump
 -------
 
@@ -34,11 +23,15 @@ Dependencies
 Usage
 -----
 
-webdump < file.html | less -R
+Example:
 
-hurl 'https://codemadness.org/' | webdump | less -R
+	url='https://codemadness.org/sfeed.html'
 
-webdump -a -i -l -r -w $(tput cols) < file.html | less -R
+	curl -s "$url" | webdump -r -b "$url" | less
+
+	curl -s "$url" | webdump -8 -a -i -l -r -b "$url" | less -R
+
+	curl -s "$url" | webdump -s 'main' -8 -a -i -l -r -b "$url" | less -R
 
 
 Goals / scope

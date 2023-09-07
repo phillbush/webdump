@@ -53,9 +53,13 @@ Write resources as TAB-separated lines to file descriptor 3.
 .Ex -std
 .Sh EXAMPLES
 .Bd -literal
-curl -s 'https://codemadness.org/' | \\
-	webdump -b 'https://codemadness.org' -l -r | \\
-	less
+url='https://codemadness.org/sfeed.html'
+
+curl -s "$url" | webdump -r -b "$url" | less
+
+curl -s "$url" | webdump -8 -a -i -l -r -b "$url" | less -R
+
+curl -s "$url" | webdump -s 'main' -8 -a -i -l -r -b "$url" | less -R
 .Ed
 .Sh SEE ALSO
 .Xr curl 1 ,
