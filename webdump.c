@@ -1346,7 +1346,7 @@ printlinkrefs(void)
 			dprintf(3, "%s\t%s\n", links_cur->type, links_cur->url);
 	}
 
-	printf("\n\nReferences\n\n");
+	printf("\nReferences\n\n");
 
 	i = 1;
 	for (links_cur = links_head; links_cur; links_cur = links_cur->next) {
@@ -2058,12 +2058,12 @@ main(int argc, char **argv)
 	parser.getnext = getchar;
 	xml_parse(&parser);
 
-	if (showrefbottom || resources)
-		printlinkrefs();
-
 	hflush();
 	if (ncells > 0)
 		newline();
+
+	if (showrefbottom || resources)
+		printlinkrefs();
 
 	hflush();
 	setmarkup(0);
