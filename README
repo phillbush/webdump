@@ -1,0 +1,98 @@
+!!!
+
+NOTE! work-in-progress (very slowly) and experimental.
+
+This code has many dirty hacks and ugliness. Intended for my personal use only.
+Knowing this: of course feel free to use it in any way you like, see the
+LICENSE.
+
+!!!
+
+
+webdump
+-------
+
+HTML to plain-text converter tool.
+
+It reads HTML in UTF-8 from stdin and writes plain-text to stdout.
+
+
+Build and install
+-----------------
+
+$ make
+# make install
+
+
+Dependencies
+------------
+
+- C compiler.
+- libc + some BSDisms.
+
+
+Usage
+-----
+
+webdump < file.html | less -R
+
+hurl 'https://codemadness.org/' | webdump | less -R
+
+webdump -a -i -l -r -w $(tput cols) < file.html | less -R
+
+
+Goals / scope
+-------------
+
+The tool will only render HTML to stdout, similarly to links -dump or
+lynx -dump but simpler and more secure.
+
+- HTML and XHTML will be supported.
+- There will be some workarounds and quirks for broken and legacy HTML code.
+- It will be usable and secure for reading HTML from mails and RSS/Atom feeds.
+- No remote resources which are part of the HTML will be downloaded:
+  images, video, audio, etc. But these may be visible as a link reference.
+- Data will be written to stdout. Intended for plain-text or a text terminal.
+- No support for Javascript, CSS, frame rendering or forms.
+- No HTTP or network protocol handling: HTML data is read from stdin.
+
+
+Features
+--------
+
+- Support for word-wrapping.
+- A mode to enable basic markup: bold, underline, italic and blink ;)
+- Indentation of headers, paragraphs, pre and list items.
+- Basic support to query an element or hide them.
+- Show link references.
+- Show link references and resources such as img, video, audio, subtitles.
+- Export link references and resources to a TAB-separated format.
+
+
+Examples
+--------
+
+To use webdump as a HTML filter for example in mutt, change in ~/.mailcap:
+
+	text/html;      /home/user/.config/scripts/mutt/viewhtml.sh %s; copiousoutput; nametemplate=%s.html
+
+The viewhtml.sh could be something like:
+
+	#!/bin/sh
+	webdump -r -l < "$1"
+
+In mutt you should then add:
+
+	auto_view text/html
+
+
+License
+-------
+
+ISC, see LICENSE file.
+
+
+Author
+------
+
+Hiltjo Posthuma <hiltjo@codemadness.org>

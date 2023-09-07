@@ -1,0 +1,66 @@
+.Dd September 7, 2023
+.Dt WEBDUMP 1
+.Os
+.Sh NAME
+.Nm webdump
+.Nd convert HTML to plain-text
+.Sh SYNOPSIS
+.Nm
+.Op Fl 8ailrx
+.Op Fl b Ar baseurl
+.Op Fl s Ar selector
+.Op Fl u Ar selector
+.Op Fl w Ar termwidth
+.Sh DESCRIPTION
+.Nm
+reads UTF-8 HTML data from stdin.
+It converts and writes the output as plain-text to stdout.
+A
+.Ar baseurl
+can be specified if the links in the feed are relative URLs.
+.Bl -tag -width Ds
+.It Fl 8
+Use UTF-8 symbols for certain items like bullet items and rulers to make the
+output fancier.
+.It Fl a
+Toggle ANSI escape codes usage, by default it is not enabled.
+.It Fl b Ar baseurl
+Base URL of links.
+This is used to make links absolute.
+.It Fl i
+Toggle if link reference numbers are displayed inline or not, by default it is
+not enabled.
+.It Fl l
+Toggle if link references are displayed at the bottom or not, by default it is
+not enabled.
+.It Fl r
+Toggle if line-wrapping mode is enabled, by default it is not enabled.
+.It Fl s
+CSS-like selectors, this sets a reader mode to hide content
+matching the selector, for example: "main" or "main#id" or "main.class".
+Multiple selectors can be specified by separating them with a comma.
+.It Fl u
+CSS-like selectors, this sets a reader mode to hide content
+matching the selector, for example: "main" or "main#id" or "main.class".
+Multiple selectors can be specified by separating them with a comma.
+.It Fl w Ar termwidth
+The terminal width.
+The default is 77 characters.
+.It Fl x
+Write resources as TAB-separated lines to file descriptor 3.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bd -literal
+curl -s 'https://codemadness.org/' | \\
+	webdump -b 'https://codemadness.org' -l -r | \\
+	less
+.Ed
+.Sh SEE ALSO
+.Xr curl 1 ,
+.Xr xmllint 1 ,
+.Xr xmlstarlet 1 ,
+.Xr ftp 1
+.Sh AUTHORS
+.An Hiltjo Posthuma Aq Mt hiltjo@codemadness.org
