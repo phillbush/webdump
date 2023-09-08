@@ -178,7 +178,8 @@ static int ncells = 0; /* current cell count */
 static int hadnewline = 0; /* count for repeated newlines */
 /* flag for skipping initial white-space in tag: for HTML white-space handling */
 static int skipinitialws = 1;
-static const int defaultindent = 2;
+#define DEFAULT_INDENT 2
+static const int defaultindent = DEFAULT_INDENT;
 static int indent;
 /* previous output sequential newlines, used for calculating margins between
    elements and reducing excessive newlines */
@@ -229,12 +230,12 @@ static struct tag tags[] = {
 { "figcaption", DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "figure",     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
 { "footer",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "h1",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
-{ "h2",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
-{ "h3",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
-{ "h4",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
-{ "h5",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
-{ "h6",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
+{ "h1",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h2",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h3",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h4",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h5",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h6",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
 { "head",       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
 { "header",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "hr",         DisplayBlock,                     0,               0,               1, 0, 0, 0, 0 },
@@ -269,7 +270,7 @@ static struct tag tags[] = {
 { "th",         DisplayTableCell,                 MarkupBold,      DisplayTableRow, 0, 1, 0, 0, 0 },
 { "thead",      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
 { "time",       DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
-{ "title",      DisplayBlock,                     0,               0,               0, 0, 0, 1, -defaultindent },
+{ "title",      DisplayBlock,                     0,               0,               0, 0, 0, 1, -DEFAULT_INDENT },
 { "tr",         DisplayTableRow,                  0,               DisplayTable,    0, 1, 0, 0, 0 },
 { "track",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "u",          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
