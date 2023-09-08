@@ -123,6 +123,7 @@ struct node {
 
 struct selectornode {
 	char tagname[256];
+	long index; /* index of node to match on: -1 if not matching on index */
 	/* attributes */
 	char id[256];
 	char classnames[1024];
@@ -1073,11 +1074,13 @@ int
 compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 {
 	int depth = 0, len;
+	long l;
 	const char *s, *start;
 	char tmp[256];
 	int nameset = 0;
 
 	memset(&nodes[0], 0, sizeof(nodes[0]));
+	nodes[0].index = -1;
 
 	s = sel;
 	for (; *s && ISSPACE((unsigned char)*s); s++)
@@ -1087,7 +1090,7 @@ compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 	for (; ; s++) {
 		/* end of tag */
 		if (!nameset &&
-		    (*s == '#' || *s == '.' || *s == '[' ||
+		    (*s == '#' || *s == '.' || *s == '@' ||
 		     *s == '\0' || ISSPACE((unsigned char)*s))) {
 			nameset = 1;
 			len = s - start; /* tag name */
@@ -1111,15 +1114,32 @@ compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 
 			nameset = 0;
 			memset(&nodes[depth], 0, sizeof(nodes[depth]));
+			nodes[depth].index = -1;
 
 			/* end of selector */
 			if (*s == '\0')
 				break;
 		}
 
+		/* index */
+		if (*s == '@') {
+			len = strcspn(s + 1, ".#@ \t\n");
+			if (len >= sizeof(tmp))
+				return 0;
+			memcpy(tmp, s + 1, len);
+			tmp[len] = '\0';
+
+			l = strtol(tmp, NULL, 10);
+			if (l >= 0)
+				nodes[depth].index = l;
+			s += len;
+			start = s + 1;
+			continue;
+		}
+
 		/* id */
 		if (*s == '#') {
-			len = strcspn(s + 1, ".#[ \t\n");
+			len = strcspn(s + 1, ".#@ \t\n");
 			if (len >= sizeof(tmp))
 				return 0;
 			memcpy(tmp, s + 1, len);
@@ -1132,7 +1152,7 @@ compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 
 		/* class */
 		if (*s == '.') {
-			len = strcspn(s + 1, ".#[ \t\n");
+			len = strcspn(s + 1, ".#@ \t\n");
 			if (len >= sizeof(tmp))
 				return 0;
 			memcpy(tmp, s + 1, len);
@@ -1224,6 +1244,13 @@ iscssmatch(struct selector *sel, struct node *root, int maxdepth)
 		if (sel->nodes[md].classnames[0] &&
 		    !isclassmatch(root[d].classnames, sel->nodes[md].classnames))
 			continue; /* no */
+
+		/* index matched */
+		if (sel->nodes[md].index != -1 &&
+		    (d == 0 ||
+		    root[d - 1].nchildren == 0 ||
+		    sel->nodes[md].index != root[d - 1].nchildren - 1))
+			continue;
 
 		md++;
 		/* all matched of one selector */
