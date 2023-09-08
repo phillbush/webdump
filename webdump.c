@@ -1893,9 +1893,7 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 			}
 		}
 		skipinitialws = 0;
-	}
-
-	if (!tagcmp(cur->tag.name, "input")) {
+	} else if (cur->tag.displaytype & DisplayInput) {
 		if (!attr_type.len) {
 			hprintf("[%-15s]", attr_value.len ? attr_value.data : ""); /* default: text */
 		} else if (!strcasecmp(attr_type.data, "button") ||
