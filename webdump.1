@@ -6,7 +6,7 @@
 .Nd convert HTML to plain-text
 .Sh SYNOPSIS
 .Nm
-.Op Fl 8ailrx
+.Op Fl 8aiIlrx
 .Op Fl b Ar baseurl
 .Op Fl s Ar selector
 .Op Fl u Ar selector
@@ -29,6 +29,9 @@ Base URL of links.
 This is used to make links absolute.
 .It Fl i
 Toggle if link reference numbers are displayed inline or not, by default it is
+not enabled.
+.It Fl I
+Toggle if URLs for link reference are displayed inline or not, by default it is
 not enabled.
 .It Fl l
 Toggle if link references are displayed at the bottom or not, by default it is

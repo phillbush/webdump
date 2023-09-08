@@ -47,6 +47,7 @@ struct uri {
 static int allowansi     = 0;  /* allow ANSI escape codes */
 static int showrefbottom = 0;  /* show link references at the bottom */
 static int showrefinline = 0;  /* show link reference number inline */
+static int showurlinline = 0;  /* show full link reference inline */
 static int linewrap      = 0;  /* line-wrapping */
 static int termwidth     = 77; /* terminal width */
 static int resources     = 0;  /* write resources line-by-line to fd 3? */
@@ -1319,46 +1320,49 @@ handleinlinelink(void)
 	char buf[4096], *url;
 	int b, r;
 
-	/* show links as reference at the bottom */
-	if ((showrefbottom || resources) && (attr_src.len || attr_href.len)) {
-		/* by default use the original URL */
-		if (attr_src.len)
-			url = attr_src.data;
-		else
-			url = attr_href.data;
+	if (!showrefbottom && !showrefinline && !showurlinline && !resources)
+		return; /* there is no need to collect the reference */
 
-		b = -1;
-		if (uri_hasscheme(url))
-			; /* already absolute: nothing to do */
-		else if (basehref[0]) /* prefer -b option over <base> */
-			b = uri_parse(basehref, &base);
-		else if (basehrefdoc[0])
-			b = uri_parse(basehrefdoc, &base);
+	if (!attr_src.len && !attr_href.len)
+		return; /* there is no reference */
 
-		if (b != -1 &&
-		    uri_parse(url, &olduri) != -1 &&
-		    uri_makeabs(&newuri, &olduri, &base) != -1 &&
-		    newuri.proto[0]) {
-			r = uri_format(buf, sizeof(buf), &newuri);
-			if (r >= 0 && (size_t)r < sizeof(buf))
-				url = buf;
-		}
+	/* by default use the original URL */
+	if (attr_src.len)
+		url = attr_src.data;
+	else
+		url = attr_href.data;
 
-		if (!url[0])
-			return;
+	b = -1;
+	if (uri_hasscheme(url))
+		; /* already absolute: nothing to do */
+	else if (basehref[0]) /* prefer -b option over <base> */
+		b = uri_parse(basehref, &base);
+	else if (basehrefdoc[0])
+		b = uri_parse(basehrefdoc, &base);
 
-		cur = &nodes[curnode];
-
-		if (showrefinline && !(cur->tag.displaytype & DisplayNone)) {
-			string_clear(&nodes_links[curnode]);
-			string_append(&nodes_links[curnode], url, strlen(url));
-		}
-
-		/* add hidden links directly to the reference,
-		   the order doesn't matter */
-		if (cur->tag.displaytype & DisplayNone)
-			addlinkref(url, cur->tag.name, 1);
+	if (b != -1 &&
+	    uri_parse(url, &olduri) != -1 &&
+	    uri_makeabs(&newuri, &olduri, &base) != -1 &&
+	    newuri.proto[0]) {
+		r = uri_format(buf, sizeof(buf), &newuri);
+		if (r >= 0 && (size_t)r < sizeof(buf))
+			url = buf;
 	}
+
+	if (!url[0])
+		return;
+
+	cur = &nodes[curnode];
+
+	if (!(cur->tag.displaytype & DisplayNone)) {
+		string_clear(&nodes_links[curnode]);
+		string_append(&nodes_links[curnode], url, strlen(url));
+	}
+
+	/* add hidden links directly to the reference,
+	   the order doesn't matter */
+	if (cur->tag.displaytype & DisplayNone)
+		addlinkref(url, cur->tag.name, 1);
 }
 
 void
@@ -1574,11 +1578,12 @@ endnode(struct node *cur)
 	/* add link and show the link number in the visible order */
 	if (!ishidden && nodes_links[curnode].len > 0) {
 		addlinkref(nodes_links[curnode].data, cur->tag.name, ishidden);
-#if 1
-		hprintf("[%zu]", ++linkcount);
-#else
-		hprintf("[%s: %s]", cur->tag.name, nodes_links[curnode].data);
-#endif
+		if (showrefinline)
+			hprintf("[%zu]", ++linkcount);
+		if (showurlinline)
+			hprintf(" [%s: %s]",
+				!tagcmp(cur->tag.name, "a") ? "link" : cur->tag.name,
+				nodes_links[curnode].data);
 	}
 
 	handleendtag(&(cur->tag));
@@ -2014,7 +2019,7 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 void
 usage(void)
 {
-	fprintf(stderr, "%s [-8ailrx] [-b basehref] [-s selector] [-u selector] [-w termwidth]\n", argv0);
+	fprintf(stderr, "%s [-8aiIlrx] [-b basehref] [-s selector] [-u selector] [-w termwidth]\n", argv0);
 	exit(1);
 }
 
@@ -2037,6 +2042,9 @@ main(int argc, char **argv)
 		break;
 	case 'i':
 		showrefinline = !showrefinline;
+		break;
+	case 'I':
+		showurlinline = !showurlinline;
 		break;
 	case 'l':
 		showrefbottom = !showrefbottom;
