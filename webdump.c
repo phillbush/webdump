@@ -1294,7 +1294,7 @@ handleinlinealt(void)
 
 		for (s = start; s < e; s++)
 			printc((unsigned char)*s);
-		hflush(); /* TODO: this flush should not be needed */
+		hflush();
 	}
 }
 
@@ -1584,6 +1584,7 @@ endnode(struct node *cur)
 			hprintf(" [%s: %s]",
 				!tagcmp(cur->tag.name, "a") ? "link" : cur->tag.name,
 				nodes_links[curnode].data);
+		hflush();
 	}
 
 	handleendtag(&(cur->tag));
