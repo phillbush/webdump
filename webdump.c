@@ -217,6 +217,8 @@ static struct tag tags[] = {
 { "dt",         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
 { "em",         DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "embed",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "figcaption", DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "figure",     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
 { "footer",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "h1",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
 { "h2",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -defaultindent },
