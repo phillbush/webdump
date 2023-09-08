@@ -148,6 +148,8 @@ static const char *str_ruler = "-";
 /* base href, to make URLs absolute */
 static char *basehref = "";
 static char basehrefdoc[4096]; /* base href in document, if any */
+static int basehrefset = 0; /* base href set and can be used? */
+static struct uri base;
 
 /* buffers for some attributes of the current tag */
 String attr_alt; /* alt attribute */
@@ -1311,14 +1313,13 @@ addlinkref(const char *url, const char *_type, int ishidden)
 	links_cur->ishidden = ishidden;
 }
 
-/* TODO: make parsed base URL global and overwrite it once. */
 static void
 handleinlinelink(void)
 {
-	struct uri base, newuri, olduri;
+	struct uri newuri, olduri;
 	struct node *cur;
 	char buf[4096], *url;
-	int b, r;
+	int r;
 
 	if (!showrefbottom && !showrefinline && !showurlinline && !resources)
 		return; /* there is no need to collect the reference */
@@ -1332,15 +1333,9 @@ handleinlinelink(void)
 	else
 		url = attr_href.data;
 
-	b = -1;
-	if (uri_hasscheme(url))
-		; /* already absolute: nothing to do */
-	else if (basehref[0]) /* prefer -b option over <base> */
-		b = uri_parse(basehref, &base);
-	else if (basehrefdoc[0])
-		b = uri_parse(basehrefdoc, &base);
-
-	if (b != -1 &&
+	/* Not an absolute URL yet: try to make it absolute.
+	   If it is not possible use the relative URL */
+	if (!uri_hasscheme(url) && basehrefset &&
 	    uri_parse(url, &olduri) != -1 &&
 	    uri_makeabs(&newuri, &olduri, &base) != -1 &&
 	    newuri.proto[0]) {
@@ -1948,7 +1943,7 @@ xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
 		string_append(&attr_id, value, valuelen);
 
 	/* <base href="..." /> */
-	if (!attrcmp(name, "href") && !tagcmp(tag, "base"))
+	if (!basehrefset && !attrcmp(name, "href") && !tagcmp(tag, "base"))
 		strlcat(basehrefdoc, value, sizeof(basehrefdoc));
 
 	/* hide tags with attribute aria-hidden or hidden */
@@ -1992,6 +1987,10 @@ static void
 xmlattrend(XMLParser *p, const char *t, size_t tl, const char *n,
 	size_t nl)
 {
+	/* set base URL, if it is set it cannot be overwritten again */
+	if (!basehrefset && basehrefdoc[0] &&
+	    !attrcmp(n, "href") && !tagcmp(t, "base"))
+		basehrefset = uri_parse(basehrefdoc, &base) != -1 ? 1 : 0;
 }
 
 static void
@@ -2013,7 +2012,7 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 	else if (!attrcmp(n, "value"))
 		string_clear(&attr_value);
 
-	if (!attrcmp(n, "href") && !tagcmp(t, "base"))
+	if (basehrefdoc[0] && !attrcmp(n, "href") && !tagcmp(t, "base"))
 		basehrefdoc[0] = '\0';
 }
 
@@ -2040,6 +2039,9 @@ main(int argc, char **argv)
 		break;
 	case 'b':
 		basehref = EARGF(usage());
+		if (uri_parse(basehref, &base) == -1)
+			usage();
+		basehrefset = 1;
 		break;
 	case 'i':
 		showrefinline = !showrefinline;
