@@ -93,6 +93,14 @@ curl -s "$url" | webdump -8 -a -i -l -r -b "$url" | less -R
 
 curl -s "$url" | webdump -s 'main' -8 -a -i -l -r -b "$url" | less -R
 .Ed
+.Pp
+To use
+.Nm
+as a HTML to text filter for example in the mutt mail client, change in
+~/.mailcap:
+.Bd -literal
+text/html; webdump -i -l -r < %s; needsterminal; copiousoutput
+.Ed
 .Sh SEE ALSO
 .Xr curl 1 ,
 .Xr xmllint 1 ,

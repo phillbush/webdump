@@ -65,14 +65,10 @@ Features
 Examples
 --------
 
-To use webdump as a HTML filter for example in mutt, change in ~/.mailcap:
+To use webdump as a HTML to text filter for example in the mutt mail client,
+change in ~/.mailcap:
 
-	text/html;      /home/user/.config/scripts/mutt/viewhtml.sh %s; copiousoutput; nametemplate=%s.html
-
-The viewhtml.sh could be something like:
-
-	#!/bin/sh
-	webdump -r -l < "$1"
+	text/html; webdump -i -l -r < %s; needsterminal; copiousoutput
 
 In mutt you should then add:
 
