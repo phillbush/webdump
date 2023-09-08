@@ -60,3 +60,4 @@
 { "times;", 0x000D7 }, /* MULTIPLICATION SIGN */
 { "trade;", 0x02122 }, /* TRADE MARK SIGN */
 { "yen;", 0x000A5 }, /* YEN SIGN */
+{ "zwnj;", 0x0200C }, /* ZERO WIDTH NON-JOINER */
