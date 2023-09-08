@@ -68,16 +68,17 @@ enum DisplayType {
 	DisplayUnknown     = 0,
 	DisplayInline      = 1 << 0,
 	DisplayInlineBlock = 1 << 1, /* unused for now */
-	DisplayBlock       = 1 << 2,
-	DisplayNone        = 1 << 3,
-	DisplayPre         = 1 << 4,
-	DisplayList        = 1 << 5,
-	DisplayListOrdered = 1 << 6,
-	DisplayListItem    = 1 << 7,
-	DisplayTable       = 1 << 8,
-	DisplayTableRow    = 1 << 9,
-	DisplayTableCell   = 1 << 10,
-	DisplayHeader      = 1 << 11
+	DisplayInput       = 1 << 2,
+	DisplayBlock       = 1 << 3,
+	DisplayNone        = 1 << 4,
+	DisplayPre         = 1 << 5,
+	DisplayList        = 1 << 6,
+	DisplayListOrdered = 1 << 7,
+	DisplayListItem    = 1 << 8,
+	DisplayTable       = 1 << 9,
+	DisplayTableRow    = 1 << 10,
+	DisplayTableCell   = 1 << 11,
+	DisplayHeader      = 1 << 12
 };
 
 /* ANSI markup */
@@ -143,7 +144,9 @@ struct selectors {
 };
 
 static const char *str_bullet_item = "* ";
+static const char *str_checkbox_checked = "x";
 static const char *str_ruler = "-";
+static const char *str_radio_checked = "*";
 
 /* base href, to make URLs absolute */
 static char *basehref = "";
@@ -153,6 +156,7 @@ static struct uri base;
 
 /* buffers for some attributes of the current tag */
 String attr_alt; /* alt attribute */
+String attr_checked; /* checked attribute */
 String attr_class; /* class attribute */
 String attr_href; /* href attribute */
 String attr_id; /* id attribute */
@@ -221,6 +225,7 @@ static struct tag tags[] = {
 { "dt",         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
 { "em",         DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "embed",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "fieldset",   DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "figcaption", DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "figure",     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
 { "footer",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
@@ -236,8 +241,9 @@ static struct tag tags[] = {
 { "html",       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
 { "i",          DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "img",        DisplayInline,                    MarkupUnderline, 0,               1, 0, 0, 0, 0 },
-{ "input",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "input",      DisplayInput,                     0,               0,               1, 0, 0, 0, 0 },
 { "label",      DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
+{ "legend",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "li",         DisplayListItem,                  0,               DisplayList,     0, 1, 0, 0, 0 },
 { "link",       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "main",       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
@@ -1684,6 +1690,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	cur = &nodes[curnode];
 
 	string_clear(&attr_alt);
+	string_clear(&attr_checked);
 	string_clear(&attr_class);
 	string_clear(&attr_href);
 	string_clear(&attr_id);
@@ -1891,18 +1898,23 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 	if (!tagcmp(cur->tag.name, "input")) {
 		if (!attr_type.len) {
 			hprintf("[%-15s]", attr_value.len ? attr_value.data : ""); /* default: text */
-		} else if (!strcasecmp(attr_type.data, "text")) {
-			hprintf("[%-15s]", attr_value.len ? attr_value.data : ""); /* text */
-		} else if (!strcasecmp(attr_type.data, "search")) {
-			hprintf("[%-15s]", attr_value.len ? attr_value.data : "");
-		} else if (!strcasecmp(attr_type.data, "button")) {
-			hprintf("[%s]", attr_value.len ? attr_value.data : "");
-		} else if (!strcasecmp(attr_type.data, "submit")) {
+		} else if (!strcasecmp(attr_type.data, "button") ||
+		           !strcasecmp(attr_type.data, "submit") ||
+		           !strcasecmp(attr_type.data, "reset")) {
 			hprintf("[%s]", attr_value.len ? attr_value.data : "");
 		} else if (!strcasecmp(attr_type.data, "checkbox")) {
-			hprint("[ ]"); /* TODO: show x or unicode checkmark when selected? */
+			hprintf("[%s]",
+				attr_checked.len &&
+				!strcasecmp(attr_checked.data, "checked") ? str_checkbox_checked : " ");
 		} else if (!strcasecmp(attr_type.data, "radio")) {
-			hprint("( )"); /* TODO: show x or unicode checkmark when selected? */
+			hprintf("[%s]",
+				attr_checked.len &&
+				!strcasecmp(attr_checked.data, "checked") ? str_radio_checked : " ");
+		} else if (!strcasecmp(attr_type.data, "hidden")) {
+			cur->tag.displaytype |= DisplayNone;
+		} else {
+			/* unrecognized / default case is text */
+			hprintf("[%-15s]", attr_value.len ? attr_value.data : "");
 		}
 	}
 
@@ -1963,6 +1975,8 @@ xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
 	if (!tagcmp(tag, "img") && !attrcmp(name, "alt"))
 		string_append(&attr_alt, value, valuelen);
 
+	if (!attrcmp(name, "checked"))
+		string_append(&attr_checked, value, valuelen);
 	if (!attrcmp(name, "type"))
 		string_append(&attr_type, value, valuelen);
 	if (!attrcmp(name, "value"))
@@ -1987,10 +2001,18 @@ static void
 xmlattrend(XMLParser *p, const char *t, size_t tl, const char *n,
 	size_t nl)
 {
+	struct node *cur;
+
+	cur = &nodes[curnode];
+
 	/* set base URL, if it is set it cannot be overwritten again */
 	if (!basehrefset && basehrefdoc[0] &&
 	    !attrcmp(n, "href") && !tagcmp(t, "base"))
 		basehrefset = uri_parse(basehrefdoc, &base) != -1 ? 1 : 0;
+
+	/* if attribute checked is set but it has no value then set it to "checked" */
+	if (cur->tag.displaytype & DisplayInput && !attrcmp(n, "checked") && !attr_checked.len)
+		string_append(&attr_checked, "checked", sizeof("checked") - 1);
 }
 
 static void
@@ -1999,6 +2021,8 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 {
 	if (!attrcmp(n, "alt"))
 		string_clear(&attr_alt);
+	else if (!attrcmp(n, "checked"))
+		string_clear(&attr_checked);
 	else if (!attrcmp(n, "class"))
 		string_clear(&attr_class);
 	else if (!attrcmp(n, "href"))
