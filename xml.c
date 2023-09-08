@@ -259,12 +259,13 @@ namedentitycmp(const void *v1, const void *v2)
 	return strcmp(n1->entity, n2->entity);
 }
 
+static const struct namedentity entities[] = {
+#include "namedentities.h"
+};
+
 static int
 namedentitytostr(const char *e, char *buf, size_t bufsiz)
 {
-	static const struct namedentity entities[] = {
-#include "namedentities.h"
-	};
 	struct namedentity find, *found;
 	size_t i;
 

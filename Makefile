@@ -19,7 +19,7 @@ BIN = ${NAME}
 SCRIPTS =
 
 SRC = ${BIN:=.c}
-HDR = arg.h namedentities.h namedentities.all.h xml.h
+HDR = arg.h namedentities.h xml.h
 
 LIBXML = libxml.a
 LIBXMLSRC = \
