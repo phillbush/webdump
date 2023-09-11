@@ -627,13 +627,14 @@ uri_format(char *buf, size_t bufsiz, struct uri *u)
 static void
 rindent(void)
 {
-	int i;
+	int i, total;
 
-	for (i = 0; i < indent + defaultindent; i++) {
+	total = indent + defaultindent;
+	for (i = 0; i < total; i++)
 		putchar(' ');
-		nbytesline++;
-		ncells++;
-	}
+
+	nbytesline += total;
+	ncells += total;
 }
 
 static void
