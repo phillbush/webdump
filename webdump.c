@@ -991,7 +991,7 @@ printpre(const char *s, size_t len)
 	i = 0;
 	if (skipinitialws) {
 		if (*s == '\n' && i < len) {
-			*s++;
+			s++;
 			i++;
 		}
 	}
