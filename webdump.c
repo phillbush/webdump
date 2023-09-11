@@ -982,12 +982,12 @@ printpre(const char *s, size_t len)
 	hadnewline = 0;
 	currentnewlines = 0;
 
-	/* skip leading white-space */
+	/* skip leading newline */
 	i = 0;
 	if (skipinitialws) {
-		for (; *s && i < len; s++, i++) {
-			if (!ISSPACE((unsigned char)*s))
-				break;
+		if (*s == '\n' && i < len) {
+			*s++;
+			i++;
 		}
 	}
 
