@@ -701,6 +701,7 @@ printansi(const char *s)
 		if (rbuflen + len + 1 < sizeof(rbuf)) {
 			memcpy(rbuf + rbuflen, s, len);
 			rbuflen += len;
+			/* NOTE: nbytesline and ncells are not counted for markup */
 		}
 	} else {
 		fputs(s, stdout);
@@ -791,7 +792,8 @@ hputchar(int c)
 	cur->hasdata = 1;
 
 	if (c == '\n') {
-		if (nbytesline <= 0)
+		/* previous line had characters, so not a repeated newline */
+		if (nbytesline > 0)
 			hadnewline = 0;
 
 		/* start a new line, no chars on this line yet */
