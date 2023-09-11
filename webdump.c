@@ -78,7 +78,8 @@ enum DisplayType {
 	DisplayTable       = 1 << 9,
 	DisplayTableRow    = 1 << 10,
 	DisplayTableCell   = 1 << 11,
-	DisplayHeader      = 1 << 12
+	DisplayHeader      = 1 << 12,
+	DisplayDl          = 1 << 13
 };
 
 /* ANSI markup */
@@ -222,7 +223,7 @@ static struct tag tags[] = {
 { "dd",         DisplayBlock,                     0,               0,               0, 1, 0, 0, 4 },
 { "del",        DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
 { "div",        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "dl",         DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
+{ "dl",         DisplayBlock|DisplayDl,           0,               0,               0, 0, 0, 0, 0 },
 { "dt",         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
 { "em",         DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "embed",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
@@ -1600,8 +1601,9 @@ static void
 xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 {
 	struct tag *found, *tag;
-	const char *child;
-	int i, j, parenttype;
+	char *child, *childs[16];
+	size_t nchilds;
+	int i, j, k, nchildfound, parenttype;
 
 	/* ignore closing of void elements, like </br>, which is not allowed */
 	if ((found = findtag(t))) {
@@ -1614,31 +1616,48 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
            https://html.spec.whatwg.org/multipage/syntax.html#optional-tags */
 
 	child = NULL;
+	nchilds = 0;
+	nchildfound = 0;
 	parenttype = 0;
 
 	if (found && found->displaytype & DisplayPre) {
 		skipinitialws = 0; /* do not skip white-space, for margins */
 	} else if (found && found->displaytype & DisplayList) {
-		child = "li";
+		childs[0] = "li";
+		nchilds = 1;
 		parenttype = DisplayList;
 	} else if (found && found->displaytype & DisplayTableRow) {
-		child = "td";
+		childs[0] = "td";
+		nchilds = 1;
 		parenttype = DisplayTableRow;
 	} else if (found && found->displaytype & DisplayTable) {
-		child = "td";
+		childs[0] = "td";
+		nchilds = 1;
 		parenttype = DisplayTable;
+	} else if (found && found->displaytype & DisplayDl) {
+		childs[0] = "p";
+		childs[1] = "dd";
+		childs[2] = "dt";
+		nchilds = 3;
+		parenttype = DisplayDl;
 	}
 
-	if (child && parenttype) {
+	if (nchilds > 0) {
 		for (i = curnode; i >= 0; i--) {
+			if (nchildfound)
+				break;
 			if ((nodes[i].tag.displaytype & parenttype))
 				break;
-			if (!tagcmp(nodes[i].tag.name, child)) {
-				/* fake closing the previous tags */
-				for (j = curnode; j >= i; j--)
-					endnode(&nodes[j]);
-				curnode = j;
-				break;
+			for (j = 0; j < nchilds; j++) {
+				child = childs[j];
+				if (!tagcmp(nodes[i].tag.name, child)) {
+					/* fake closing the previous tags */
+					for (k = curnode; k >= i; k--)
+						endnode(&nodes[k]);
+					curnode = k;
+					nchildfound = 1;
+					break;
+				}
 			}
 		}
 	}
@@ -1685,9 +1704,10 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 {
 	struct tag *found;
 	struct node *cur;
-	const char *child;
+	char *child, *childs[16];
+	size_t nchilds;
 	char *s;
-	int i, j, parenttype;
+	int i, j, k, nchildfound, parenttype;
 
 	if (curnode >= MAX_DEPTH - 2)
 		errx(1, "max tag depth reached: %d\n", curnode);
@@ -1711,38 +1731,69 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
            https://html.spec.whatwg.org/multipage/syntax.html#optional-tags */
 
 	child = NULL;
+	nchilds = 0;
+	nchildfound = 0;
 	parenttype = 0;
 
-	/* if optional tag <p> is open and a block element is found, close </p>. */
+	/* if optional tag <p> is open and a list element is found, close </p>. */
 	if (found && found->displaytype & DisplayList) {
 		/* not inside a list */
-		child = "p";
+		childs[0] = "p";
+		nchilds = 1;
 		parenttype = DisplayList;
 	} else if (found && found->isoptional) {
 		if (!tagcmp(t, "li")) {
-			child = "li";
+			childs[0] = "li";
+			nchilds = 1;
 			parenttype = DisplayList;
 		} else if (!tagcmp(t, "td")) {
-			child = "td";
+			childs[0] = "td";
+			nchilds = 1;
 			parenttype = DisplayTableRow;
 		} else if (!tagcmp(t, "tr")) {
-			child = "tr";
+			childs[0] = "tr";
+			nchilds = 1;
 			parenttype = DisplayTable;
+		} else if (!tagcmp(t, "p")) {
+			childs[0] = "p";
+			nchilds = 1;
+			parenttype = 0; /* seek until the root */
+		} else if (!tagcmp(t, "dt")) {
+			childs[0] = "dd";
+			nchilds = 1;
+			parenttype = 0; /* seek until the root */
+		} else if (!tagcmp(t, "dd")) {
+			childs[0] = "dd";
+			childs[1] = "dt";
+			nchilds = 2;
+			parenttype = 0; /* seek until the root */
 		} else if (!tagcmp(t, cur->tag.name)) {
 			/* fake closing the previous tag if it is the same and repeated */
 			xmltagend(p, t, tl, 0);
 		}
+	} else if (found && found->displaytype & DisplayBlock) {
+		/* check if we have an open "<p>" tag */
+		childs[0] = "p";
+		childs[1] = "dl";
+		nchilds = 2;
+		parenttype = 0; /* seek until the root */
 	}
 
-	if (child && parenttype) {
+	if (nchilds > 0) {
 		for (i = curnode; i >= 0; i--) {
+			if (nchildfound)
+				break;
 			if ((nodes[i].tag.displaytype & parenttype))
 				break;
-			if (!tagcmp(nodes[i].tag.name, child)) {
-				/* fake closing the previous tags */
-				for (j = curnode; j >= i; j--)
-					xmltagend(p, nodes[j].tag.name, strlen(nodes[j].tag.name), 0);
-				break;
+			for (j = 0; j < nchilds; j++) {
+				child = childs[j];
+				if (!tagcmp(nodes[i].tag.name, child)) {
+					/* fake closing the previous tags */
+					for (k = curnode; k >= i; k--)
+						xmltagend(p, nodes[k].tag.name, strlen(nodes[k].tag.name), 0);
+					nchildfound = 1;
+					break;
+				}
 			}
 		}
 	}
