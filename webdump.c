@@ -230,6 +230,7 @@ static struct tag tags[] = {
 { "figcaption", DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "figure",     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
 { "footer",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "form",       DisplayBlock,                     0,               0,               0, 0, 0, 1, 0 },
 { "h1",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
 { "h2",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
 { "h3",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
