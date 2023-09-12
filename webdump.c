@@ -677,10 +677,12 @@ hflush(void)
 		return;
 
 	if (!nbytesline) {
-		emitmarkup(0);
+		if (curmarkup)
+			emitmarkup(0);
 		rindent();
 		/* emit code again per line, needed for GNU/less -R */
-		emitmarkup(curmarkup);
+		if (curmarkup)
+			emitmarkup(curmarkup);
 	}
 
 	for (i = 0; i < rbuflen; i++)
@@ -833,10 +835,12 @@ hputchar(int c)
 			ncells = 0;
 		} else {
 			if (!nbytesline) {
-				emitmarkup(0);
+				if (curmarkup)
+					emitmarkup(0);
 				rindent();
 				/* emit code again per line, needed for GNU/less -R */
-				emitmarkup(curmarkup);
+				if (curmarkup)
+					emitmarkup(curmarkup);
 			}
 			putchar(c);
 			nbytesline++;
@@ -1020,10 +1024,12 @@ printpre(const char *s, size_t len)
 		case '\t':
 			hadnewline = 0;
 			if (!nbytesline) {
-				emitmarkup(0);
+				if (curmarkup)
+					emitmarkup(0);
 				rindent();
 				/* emit code again per line, needed for GNU/less -R */
-				emitmarkup(curmarkup);
+				if (curmarkup)
+					emitmarkup(curmarkup);
 			}
 
 			/* TAB to 8 spaces */
@@ -1036,10 +1042,12 @@ printpre(const char *s, size_t len)
 				continue;
 
 			if (!nbytesline) {
-				emitmarkup(0);
+				if (curmarkup)
+					emitmarkup(0);
 				rindent();
 				/* emit code again per line, needed for GNU/less -R */
-				emitmarkup(curmarkup);
+				if (curmarkup)
+					emitmarkup(curmarkup);
 			}
 
 			putchar(*s);
