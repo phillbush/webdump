@@ -1,4 +1,4 @@
-.Dd September 8, 2023
+.Dd September 12, 2023
 .Dt WEBDUMP 1
 .Os
 .Sh NAME
@@ -6,7 +6,7 @@
 .Nd convert HTML to plain-text
 .Sh SYNOPSIS
 .Nm
-.Op Fl 8aiIlrx
+.Op Fl 8adiIlrx
 .Op Fl b Ar baseurl
 .Op Fl s Ar selector
 .Op Fl u Ar selector
@@ -28,6 +28,9 @@ Toggle ANSI escape codes usage, by default it is not enabled.
 Base URL of links.
 This is used to make links absolute.
 The specified URL is always preferred over the value in a <base/> tag.
+.It Fl d
+Deduplicate link references.
+When a duplicate link reference is found reuse the same link reference number.
 .It Fl i
 Toggle if link reference numbers are displayed inline or not, by default it is
 not enabled.

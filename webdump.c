@@ -51,12 +51,14 @@ static int showurlinline = 0;  /* show full link reference inline */
 static int linewrap      = 0;  /* line-wrapping */
 static int termwidth     = 77; /* terminal width */
 static int resources     = 0;  /* write resources line-by-line to fd 3? */
+static int uniqrefs      = 0;  /* number unique references */
 
 /* linked-list of link references */
 struct linkref {
 	char *type;
 	char *url;
 	int ishidden;
+	size_t linknr;
 	struct linkref *next;
 };
 
@@ -626,6 +628,20 @@ uri_format(char *buf, size_t bufsiz, struct uri *u)
 		u->query,
 		u->fragment[0] ? "#" : "",
 		u->fragment);
+}
+
+/* compare tag name (case-insensitive) */
+int
+tagcmp(const char *s1, const char *s2)
+{
+	return strcasecmp(s1, s2);
+}
+
+/* compare attribute name (case-insensitive) */
+int
+attrcmp(const char *s1, const char *s2)
+{
+	return strcasecmp(s1, s2);
 }
 
 static void
@@ -1325,9 +1341,26 @@ handleinlinealt(void)
 	}
 }
 
-static void
-addlinkref(const char *url, const char *_type, int ishidden)
+/* slow linear lookup of link references
+   TODO: optimize it, maybe using tree.h RB_TREE? */
+static struct linkref *
+findlinkref(const char *url)
 {
+	struct linkref *cur;
+
+	for (cur = links_head; cur; cur = cur->next) {
+		if (!strcmp(url, cur->url))
+			return cur;
+	}
+	return NULL;
+}
+
+static struct linkref *
+addlinkref(const char *url, const char *_type, int ishidden, int linknr)
+{
+	if (!tagcmp(_type, "a"))
+		_type = "link";
+
 	/* add to linked list */
 	if (!links_head)
 		links_cur = links_head = ecalloc(1, sizeof(*links_head));
@@ -1336,6 +1369,9 @@ addlinkref(const char *url, const char *_type, int ishidden)
 	links_cur->url = estrdup(url);
 	links_cur->type = estrdup(_type);
 	links_cur->ishidden = ishidden;
+	links_cur->linknr = linknr;
+
+	return links_cur;
 }
 
 static void
@@ -1382,7 +1418,7 @@ handleinlinelink(void)
 	/* add hidden links directly to the reference,
 	   the order doesn't matter */
 	if (cur->tag.displaytype & DisplayNone)
-		addlinkref(url, cur->tag.name, 1);
+		addlinkref(url, cur->tag.name, 1, 0);
 }
 
 void
@@ -1407,12 +1443,13 @@ printlinkrefs(void)
 			hashiddenrefs = 1;
 			continue;
 		}
-		printf(" %zu. %s (%s)\n", i, links_cur->url, links_cur->type);
+		printf(" %zu. %s (%s)\n", links_cur->linknr, links_cur->url, links_cur->type);
 		i++;
 	}
 
 	if (hashiddenrefs)
 		printf("\n\nHidden references\n\n");
+	/* hidden links don't have a link number, just count them */
 	for (links_cur = links_head; links_cur; links_cur = links_cur->next) {
 		if (!links_cur->ishidden)
 			continue;
@@ -1507,20 +1544,6 @@ xmlcdata(XMLParser *p, const char *data, size_t datalen)
 	xmldata(p, data, datalen); /* treat CDATA as data */
 }
 
-/* compare tag name (case-insensitive) */
-int
-tagcmp(const char *s1, const char *s2)
-{
-	return strcasecmp(s1, s2);
-}
-
-/* compare attribute name (case-insensitive) */
-int
-attrcmp(const char *s1, const char *s2)
-{
-	return strcasecmp(s1, s2);
-}
-
 /* lookup function to compare tag name (case-insensitive) for sort functions */
 int
 findtagcmp(const void *v1, const void *v2)
@@ -1582,6 +1605,7 @@ handleendtag(struct tag *tag)
 static void
 endnode(struct node *cur)
 {
+	struct linkref *ref;
 	int i, ishidden;
 
 	/* set a flag indicating the element and its parent containers have data.
@@ -1597,14 +1621,24 @@ endnode(struct node *cur)
 
 	/* add link and show the link number in the visible order */
 	if (!ishidden && nodes_links[curnode].len > 0) {
-		addlinkref(nodes_links[curnode].data, cur->tag.name, ishidden);
+		if (uniqrefs)
+			ref = findlinkref(nodes_links[curnode].data);
+		else
+			ref = NULL;
+
+		/* new link: add it */
+		if (!ref) {
+			linkcount++;
+			ref = addlinkref(nodes_links[curnode].data,
+				cur->tag.name, ishidden, linkcount);
+		}
+
 		if (showrefinline)
-			hprintf("[%zu]", ++linkcount);
+			hprintf("[%zu]", ref->linknr);
 		if (showurlinline)
-			hprintf(" [%s: %s]",
-				!tagcmp(cur->tag.name, "a") ? "link" : cur->tag.name,
-				nodes_links[curnode].data);
-		hflush();
+			hprintf(" [%s: %s]", ref->type, ref->url);
+		if (showrefinline || showurlinline)
+			hflush();
 	}
 
 	handleendtag(&(cur->tag));
@@ -2110,7 +2144,7 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 void
 usage(void)
 {
-	fprintf(stderr, "%s [-8aiIlrx] [-b basehref] [-s selector] [-u selector] [-w termwidth]\n", argv0);
+	fprintf(stderr, "%s [-8adiIlrx] [-b basehref] [-s selector] [-u selector] [-w termwidth]\n", argv0);
 	exit(1);
 }
 
@@ -2133,6 +2167,9 @@ main(int argc, char **argv)
 		if (uri_parse(basehref, &base) == -1)
 			usage();
 		basehrefset = 1;
+		break;
+	case 'd':
+		uniqrefs = !uniqrefs;
 		break;
 	case 'i':
 		showrefinline = !showrefinline;
