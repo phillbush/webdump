@@ -1571,10 +1571,10 @@ handleendtag(struct tag *tag)
 		hflush();
 		for (i = currentnewlines; i < marginbottom; i++) {
 			putchar('\n');
+			nbytesline = 0;
+			ncells = 0;
 			currentnewlines++;
 		}
-		nbytesline = 0;
-		ncells = 0;
 		hadnewline = 1;
 	}
 }
@@ -1933,10 +1933,10 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 		hflush();
 		for (i = currentnewlines; i < margintop; i++) {
 			putchar('\n');
+			nbytesline = 0;
+			ncells = 0;
 			currentnewlines++;
 		}
-		nbytesline = 0;
-		ncells = 0;
 		hadnewline = 1;
 	}
 
