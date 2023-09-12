@@ -634,6 +634,8 @@ rindent(void)
 	int i, total;
 
 	total = indent + defaultindent;
+	if (total < 0)
+		total = 0;
 	for (i = 0; i < total; i++)
 		putchar(' ');
 
