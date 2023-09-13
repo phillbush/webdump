@@ -1856,12 +1856,12 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 		} else if (!tagcmp(t, "dt")) {
 			childs[0] = "dd";
 			nchilds = 1;
-			parenttype = 0; /* seek until the root */
+			parenttype = DisplayDl;
 		} else if (!tagcmp(t, "dd")) {
 			childs[0] = "dd";
 			childs[1] = "dt";
 			nchilds = 2;
-			parenttype = 0; /* seek until the root */
+			parenttype = DisplayDl;
 		} else if (!tagcmp(t, cur->tag.name)) {
 			/* fake closing the previous tag if it is the same and repeated */
 			xmltagend(p, t, tl, 0);
@@ -1871,7 +1871,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 		childs[0] = "p";
 		childs[1] = "dl";
 		nchilds = 2;
-		parenttype = 0; /* seek until the root */
+		parenttype = DisplayDl;
 	}
 
 	if (nchilds > 0) {
