@@ -2127,6 +2127,9 @@ xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
 	if (!attrcmp(name, "aria-hidden") || !attrcmp(name, "hidden"))
 		cur->tag.displaytype |= DisplayNone;
 
+	if (!tagcmp(tag, "select") && !attrcmp(name, "multiple"))
+		cur->tag.displaytype |= DisplaySelectMulti;
+
 	if (!tagcmp(tag, "a") && !attrcmp(name, "href"))
 		string_append(&attr_src, value, valuelen);
 
