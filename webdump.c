@@ -2131,13 +2131,16 @@ xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
 		cur->tag.displaytype |= DisplaySelectMulti;
 
 	if (!tagcmp(tag, "a") && !attrcmp(name, "href"))
-		string_append(&attr_src, value, valuelen);
+		string_append(&attr_href, value, valuelen);
+
+	if (!tagcmp(tag, "object") && !attrcmp(name, "data"))
+		string_append(&attr_data, value, valuelen);
 
 	if ((!tagcmp(tag, "img") || !tagcmp(tag, "video") ||
 	     !tagcmp(tag, "source") || !tagcmp(tag, "track") ||
 	     !tagcmp(tag, "audio")) &&
-	    !attrcmp(name, "src") && valuelen)
-		string_append(&attr_href, value, valuelen);
+	     !attrcmp(name, "src") && valuelen)
+		string_append(&attr_src, value, valuelen);
 
 	/* show img alt attribute as text. */
 	if (!tagcmp(tag, "img") && !attrcmp(name, "alt"))
@@ -2145,9 +2148,9 @@ xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
 
 	if (!attrcmp(name, "checked"))
 		string_append(&attr_checked, value, valuelen);
-	if (!attrcmp(name, "type"))
+	else if (!attrcmp(name, "type"))
 		string_append(&attr_type, value, valuelen);
-	if (!attrcmp(name, "value"))
+	else if (!attrcmp(name, "value"))
 		string_append(&attr_value, value, valuelen);
 }
 
