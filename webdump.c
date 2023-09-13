@@ -2061,10 +2061,12 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 	} else if (cur->tag.displaytype & DisplayInput) {
 		if (!attr_type.len) {
 			hprintf("[%-15s]", attr_value.len ? attr_value.data : ""); /* default: text */
-		} else if (!strcasecmp(attr_type.data, "button") ||
-		           !strcasecmp(attr_type.data, "submit") ||
-		           !strcasecmp(attr_type.data, "reset")) {
+		} else if (!strcasecmp(attr_type.data, "button")) {
 			hprintf("[%s]", attr_value.len ? attr_value.data : "");
+		} else if (!strcasecmp(attr_type.data, "submit")) {
+			hprintf("[%s]", attr_value.len ? attr_value.data : "Submit Query");
+		} else if (!strcasecmp(attr_type.data, "reset")) {
+			hprintf("[%s]", attr_value.len ? attr_value.data : "Reset");
 		} else if (!strcasecmp(attr_type.data, "checkbox")) {
 			hprintf("[%s]",
 				attr_checked.len &&
