@@ -1598,6 +1598,11 @@ handleendtag(struct tag *tag)
 	if (reader_ignore)
 		return;
 
+	if (tag->displaytype & (DisplayButton | DisplayOption)) {
+		hputchar(']');
+		hflush();
+	}
+
 	if (tag->displaytype & (DisplayBlock | DisplayHeader | DisplayTable | DisplayTableRow |
 		DisplayList | DisplayListItem | DisplayPre)) {
 		endblock(); /* break line if needed */
@@ -1704,6 +1709,10 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 		childs[0] = "td";
 		nchilds = 1;
 		parenttype = DisplayTable;
+	} else if (found && found->displaytype & DisplaySelect) {
+		childs[0] = "option";
+		nchilds = 1;
+		parenttype = DisplaySelect;
 	} else if (found && found->displaytype & DisplayDl) {
 		childs[0] = "p";
 		childs[1] = "dd";
@@ -1829,6 +1838,10 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 			childs[0] = "p";
 			nchilds = 1;
 			parenttype = 0; /* seek until the root */
+		} else if (!tagcmp(t, "option")) {
+			childs[0] = "option";
+			nchilds = 1;
+			parenttype = DisplaySelect;
 		} else if (!tagcmp(t, "dt")) {
 			childs[0] = "dd";
 			nchilds = 1;
@@ -1954,6 +1967,15 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 		handleinlinealt();
 	}
 
+	/* <select><option> */
+	if (cur->tag.displaytype & DisplayOption) {
+		/* <select multiple>: show all options */
+		if (parent->tag.displaytype & DisplaySelectMulti)
+			cur->tag.displaytype |= DisplayBlock;
+		else if (parent->nchildren > 1) /* show the first item as selected */
+			cur->tag.displaytype |= DisplayNone; /* else hide */
+	}
+
 	if (cur->tag.displaytype & DisplayNone)
 		return;
 
@@ -1966,6 +1988,11 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 		DisplayTable | DisplayTableRow |
 		DisplayList | DisplayListItem))) {
 		startblock(); /* break line if needed */
+	}
+
+	if (cur->tag.displaytype & (DisplayButton | DisplayOption)) {
+		hflush();
+		hputchar('[');
 	}
 
 	margintop = cur->tag.margintop;
