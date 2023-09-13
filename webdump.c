@@ -165,6 +165,7 @@ static struct uri base;
 String attr_alt; /* alt attribute */
 String attr_checked; /* checked attribute */
 String attr_class; /* class attribute */
+String attr_data; /* data attribute */
 String attr_href; /* href attribute */
 String attr_id; /* id attribute */
 String attr_src; /* src attribute */
@@ -1402,14 +1403,19 @@ handleinlinelink(void)
 	if (!showrefbottom && !showrefinline && !showurlinline && !resources)
 		return; /* there is no need to collect the reference */
 
-	if (!attr_src.len && !attr_href.len)
+	if (!attr_href.len && !attr_src.len && !attr_data.len)
 		return; /* there is no reference */
 
 	/* by default use the original URL */
 	if (attr_src.len)
 		url = attr_src.data;
-	else
+	else if (attr_href.len)
 		url = attr_href.data;
+	else
+		url = attr_data.data;
+
+	if (!url)
+		return;
 
 	/* Not an absolute URL yet: try to make it absolute.
 	   If it is not possible use the relative URL */
@@ -1781,6 +1787,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	string_clear(&attr_alt);
 	string_clear(&attr_checked);
 	string_clear(&attr_class);
+	string_clear(&attr_data);
 	string_clear(&attr_href);
 	string_clear(&attr_id);
 	string_clear(&attr_src);
@@ -2143,6 +2150,8 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 		string_clear(&attr_checked);
 	else if (!attrcmp(n, "class"))
 		string_clear(&attr_class);
+	else if (!attrcmp(n, "data"))
+		string_clear(&attr_data);
 	else if (!attrcmp(n, "href"))
 		string_clear(&attr_href);
 	else if (!attrcmp(n, "id"))
