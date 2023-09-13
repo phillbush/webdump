@@ -1661,12 +1661,23 @@ endnode(struct node *cur)
 				cur->tag.name, ishidden, linkcount);
 		}
 
+		if (showrefinline || showurlinline) {
+			hflush();
+			startmarkup(MarkupReverse);
+		}
+
 		if (showrefinline)
 			hprintf("[%zu]", ref->linknr);
-		if (showurlinline)
-			hprintf(" [%s: %s]", ref->type, ref->url);
-		if (showrefinline || showurlinline)
+		if (showurlinline) {
+			if (!tagcmp("link", ref->type))
+				hprintf("[%s]", ref->url);
+			else
+				hprintf("[%s: %s]", ref->type, ref->url);
+		}
+		if (showrefinline || showurlinline) {
+			endmarkup(MarkupReverse);
 			hflush();
+		}
 	}
 
 	handleendtag(&(cur->tag));
