@@ -53,19 +53,6 @@ static int termwidth     = 77; /* terminal width */
 static int resources     = 0;  /* write resources line-by-line to fd 3? */
 static int uniqrefs      = 0;  /* number unique references */
 
-/* linked-list of link references */
-struct linkref {
-	char *type;
-	char *url;
-	int ishidden;
-	size_t linknr;
-	struct linkref *next;
-};
-
-static struct linkref *links_head;
-static struct linkref *links_cur;
-static int linkcount; /* visible link count */
-
 enum DisplayType {
 	DisplayUnknown     = 0,
 	DisplayInline      = 1 << 0,
@@ -106,8 +93,22 @@ typedef struct string {
 	size_t  bufsiz; /* allocated size */
 } String;
 
+enum TagId { TagA = 1, TagAddress, TagArea, TagArticle, TagAside, TagAudio,
+TagB, TagBase, TagBlink, TagBlockquote, TagBody, TagBr, TagButton, TagCite,
+TagCol, TagColgroup, TagDatalist, TagDd, TagDel, TagDetails, TagDfn, TagDir,
+TagDiv, TagDl, TagDt, TagEm, TagEmbed, TagFieldset, TagFigcaption, TagFigure,
+TagFooter, TagForm, TagFrame, TagH1, TagH2, TagH3, TagH4, TagH5, TagH6,
+TagHead, TagHeader, TagHr, TagHtml, TagI, TagIframe, TagImg, TagInput, TagIns,
+TagLabel, TagLegend, TagLi, TagLink, TagMain, TagMark, TagMenu, TagMeta,
+TagNav, TagObject, TagOl, TagOption, TagP, TagParam, TagPre, TagS, TagScript,
+TagSearch, TagSection, TagSelect, TagSource, TagStrike, TagStrong, TagStyle,
+TagSummary, TagTable, TagTbody, TagTd, TagTemplate, TagTextarea, TagTfoot,
+TagTh, TagThead, TagTitle, TagTr, TagTrack, TagU, TagUl, TagVar, TagVideo,
+TagWbr, TagXmp };
+
 struct tag {
 	const char *name;
+	enum TagId id;
 	enum DisplayType displaytype;
 	enum MarkupType markuptype; /* ANSI markup */
 	enum DisplayType parenttype; /* display type belonging to element */
@@ -149,6 +150,20 @@ struct selectors {
 	struct selector **selectors;
 	size_t count;
 };
+
+/* linked-list of link references */
+struct linkref {
+	char *type;
+	enum TagId tagid;
+	char *url;
+	int ishidden;
+	size_t linknr;
+	struct linkref *next;
+};
+
+static struct linkref *links_head;
+static struct linkref *links_cur;
+static int linkcount; /* visible link count */
 
 static const char *str_bullet_item = "* ";
 static const char *str_checkbox_checked = "x";
@@ -212,96 +227,100 @@ static enum MarkupType curmarkup;
 /* selector to match */
 static struct selectors *sel_hide, *sel_show;
 
-/* tag          displaytype                       markup           parent           v  o  b  a  i */
+/* tags table: needs to be sorted like tagcmp(), alphabetically */
+
+/* tag          id             displaytype                       markup           parent           v  o  b  a  i */
 static struct tag tags[] = {
-{ "a",          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "address",    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "area",       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "article",    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "aside",      DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "audio",      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "b",          DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
-{ "base",       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "blink",      DisplayInline,                    MarkupBlink,     0,               0, 0, 0, 0, 0 },
-{ "blockquote", DisplayBlock,                     0,               0,               0, 0, 0, 0, 2 },
-{ "body",       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "br",         0,                                0,               0,               1, 0, 0, 0, 0 },
-{ "button",     DisplayInline | DisplayButton,    0,               0,               0, 0, 0, 0, 0 },
-{ "cite",       DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "col",        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "colgroup",   DisplayInline,                    0,               0,               0, 1, 0, 0, 0 },
-{ "datalist",   DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
-{ "dd",         DisplayBlock,                     0,               0,               0, 1, 0, 0, 4 },
-{ "del",        DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
-{ "details",    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "dfn",        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "dir",        DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
-{ "div",        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "dl",         DisplayBlock | DisplayDl,         0,               0,               0, 0, 0, 0, 0 },
-{ "dt",         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
-{ "em",         DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "embed",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "fieldset",   DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "figcaption", DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "figure",     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
-{ "footer",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "form",       DisplayBlock,                     0,               0,               0, 0, 0, 1, 0 },
-{ "h1",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h2",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h3",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h4",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h5",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h6",         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "head",       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
-{ "header",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "hr",         DisplayBlock,                     0,               0,               1, 0, 0, 0, 0 },
-{ "html",       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
-{ "i",          DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "img",        DisplayInline,                    MarkupUnderline, 0,               1, 0, 0, 0, 0 },
-{ "input",      DisplayInput,                     0,               0,               1, 0, 0, 0, 0 },
-{ "ins",        DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "label",      DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
-{ "legend",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "li",         DisplayListItem,                  0,               DisplayList,     0, 1, 0, 0, 0 },
-{ "link",       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "main",       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "mark",       DisplayInline,                    MarkupReverse,   0,               0, 0, 0, 0, 0 },
-{ "menu",       DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
-{ "meta",       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "nav",        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "object",     DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
-{ "ol",         DisplayList | DisplayListOrdered, 0,               0,               0, 0, 1, 1, 0 },
-{ "option",     DisplayInline | DisplayOption,    0,               0,               0, 1, 0, 0, 0 },
-{ "p",          DisplayBlock,                     0,               0,               0, 1, 1, 1, 0 },
-{ "param",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "pre",        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 },
-{ "s",          DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
-{ "search",     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "script",     DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
-{ "section",    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "select",     DisplayInline | DisplaySelect,    0,               0,               0, 0, 0, 0, 0 },
-{ "source",     DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "strike",     DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
-{ "strong",     DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
-{ "style",      DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
-{ "summary",    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "table",      DisplayTable,                     0,               0,               0, 0, 0, 0, 0 },
-{ "tbody",      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
-{ "td",         DisplayTableCell,                 0,               DisplayTableRow, 0, 1, 0, 0, 0 },
-{ "template",   DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
-{ "textarea",   DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
-{ "tfoot",      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
-{ "th",         DisplayTableCell,                 MarkupBold,      DisplayTableRow, 0, 1, 0, 0, 0 },
-{ "thead",      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
-{ "title",      DisplayBlock,                     0,               0,               0, 0, 0, 1, -DEFAULT_INDENT },
-{ "tr",         DisplayTableRow,                  0,               DisplayTable,    0, 1, 0, 0, 0 },
-{ "track",      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "u",          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "ul",         DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
-{ "var",        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "video",      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "wbr",        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "xmp",        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 }
+{ "a",          TagA,          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
+{ "address",    TagAddress,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "area",       TagArea,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "article",    TagArticle,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "aside",      TagAside,      DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "audio",      TagAudio,      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
+{ "b",          TagB,          DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
+{ "base",       TagBase,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "blink",      TagBlink,      DisplayInline,                    MarkupBlink,     0,               0, 0, 0, 0, 0 },
+{ "blockquote", TagBlockquote, DisplayBlock,                     0,               0,               0, 0, 0, 0, 2 },
+{ "body",       TagBody,       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "br",         TagBr,         0,                                0,               0,               1, 0, 0, 0, 0 },
+{ "button",     TagButton,     DisplayInline | DisplayButton,    0,               0,               0, 0, 0, 0, 0 },
+{ "cite",       TagCite,       DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
+{ "col",        TagCol,        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "colgroup",   TagColgroup,   DisplayInline,                    0,               0,               0, 1, 0, 0, 0 },
+{ "datalist",   TagDatalist,   DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
+{ "dd",         TagDd,         DisplayBlock,                     0,               0,               0, 1, 0, 0, 4 },
+{ "del",        TagDel,        DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
+{ "details",    TagDetails,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "dfn",        TagDfn,        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
+{ "dir",        TagDir,        DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "div",        TagDiv,        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "dl",         TagDl,         DisplayBlock | DisplayDl,         0,               0,               0, 0, 0, 0, 0 },
+{ "dt",         TagDt,         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
+{ "em",         TagEm,         DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
+{ "embed",      TagEmbed,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "fieldset",   TagFieldset,   DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "figcaption", TagFigcaption, DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "figure",     TagFigure,     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
+{ "footer",     TagFooter,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "form",       TagForm,       DisplayBlock,                     0,               0,               0, 0, 0, 1, 0 },
+{ "frame",      TagFrame,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "h1",         TagH1,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h2",         TagH2,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h3",         TagH3,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h4",         TagH4,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h5",         TagH5,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h6",         TagH6,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "head",       TagHead,       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
+{ "header",     TagHeader,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "hr",         TagHr,         DisplayBlock,                     0,               0,               1, 0, 0, 0, 0 },
+{ "html",       TagHtml,       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
+{ "i",          TagI,          DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
+{ "iframe",     TagIframe,     DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
+{ "img",        TagImg,        DisplayInline,                    MarkupUnderline, 0,               1, 0, 0, 0, 0 },
+{ "input",      TagInput,      DisplayInput,                     0,               0,               1, 0, 0, 0, 0 },
+{ "ins",        TagIns,        DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
+{ "label",      TagLabel,      DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
+{ "legend",     TagLegend,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "li",         TagLi,         DisplayListItem,                  0,               DisplayList,     0, 1, 0, 0, 0 },
+{ "link",       TagLink,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "main",       TagMain,       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "mark",       TagMark,       DisplayInline,                    MarkupReverse,   0,               0, 0, 0, 0, 0 },
+{ "menu",       TagMenu,       DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "meta",       TagMeta,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "nav",        TagNav,        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "object",     TagObject,     DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
+{ "ol",         TagOl,         DisplayList | DisplayListOrdered, 0,               0,               0, 0, 1, 1, 0 },
+{ "option",     TagOption,     DisplayInline | DisplayOption,    0,               0,               0, 1, 0, 0, 0 },
+{ "p",          TagP,          DisplayBlock,                     0,               0,               0, 1, 1, 1, 0 },
+{ "param",      TagParam,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "pre",        TagPre,        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 },
+{ "s",          TagS,          DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
+{ "script",     TagScript,     DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
+{ "search",     TagSearch,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "section",    TagSection,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "select",     TagSelect,     DisplayInline | DisplaySelect,    0,               0,               0, 0, 0, 0, 0 },
+{ "source",     TagSource,     DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "strike",     TagStrike,     DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
+{ "strong",     TagStrong,     DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
+{ "style",      TagStyle,      DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
+{ "summary",    TagSummary,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "table",      TagTable,      DisplayTable,                     0,               0,               0, 0, 0, 0, 0 },
+{ "tbody",      TagTbody,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
+{ "td",         TagTd,         DisplayTableCell,                 0,               DisplayTableRow, 0, 1, 0, 0, 0 },
+{ "template",   TagTemplate,   DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
+{ "textarea",   TagTextarea,   DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
+{ "tfoot",      TagTfoot,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
+{ "th",         TagTh,         DisplayTableCell,                 MarkupBold,      DisplayTableRow, 0, 1, 0, 0, 0 },
+{ "thead",      TagThead,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
+{ "title",      TagTitle,      DisplayBlock,                     0,               0,               0, 0, 0, 1, -DEFAULT_INDENT },
+{ "tr",         TagTr,         DisplayTableRow,                  0,               DisplayTable,    0, 1, 0, 0, 0 },
+{ "track",      TagTrack,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "u",          TagU,          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
+{ "ul",         TagUl,         DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "var",        TagVar,        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
+{ "video",      TagVideo,      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
+{ "wbr",        TagWbr,        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
+{ "xmp",        TagXmp,        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 }
 };
 
 /* hint for compilers and static analyzers that a function exits */
@@ -1374,9 +1393,10 @@ findlinkref(const char *url)
 }
 
 static struct linkref *
-addlinkref(const char *url, const char *_type, int ishidden, int linknr)
+addlinkref(const char *url, const char *_type, enum TagId tagid, int ishidden,
+	int linknr)
 {
-	if (!tagcmp(_type, "a"))
+	if (tagid == TagA)
 		_type = "link";
 
 	/* add to linked list */
@@ -1386,6 +1406,7 @@ addlinkref(const char *url, const char *_type, int ishidden, int linknr)
 		links_cur = links_cur->next = ecalloc(1, sizeof(*links_head));
 	links_cur->url = estrdup(url);
 	links_cur->type = estrdup(_type);
+	links_cur->tagid = tagid;
 	links_cur->ishidden = ishidden;
 	links_cur->linknr = linknr;
 
@@ -1441,7 +1462,7 @@ handleinlinelink(void)
 	/* add hidden links directly to the reference,
 	   the order doesn't matter */
 	if (cur->tag.displaytype & DisplayNone)
-		addlinkref(url, cur->tag.name, 1, 0);
+		addlinkref(url, cur->tag.name, cur->tag.id, 1, 0);
 }
 
 void
@@ -1658,7 +1679,7 @@ endnode(struct node *cur)
 		if (!ref) {
 			linkcount++;
 			ref = addlinkref(nodes_links[curnode].data,
-				cur->tag.name, ishidden, linkcount);
+				cur->tag.name, cur->tag.id, ishidden, linkcount);
 		}
 
 		if (showrefinline || showurlinline) {
@@ -1669,7 +1690,7 @@ endnode(struct node *cur)
 		if (showrefinline)
 			hprintf("[%zu]", ref->linknr);
 		if (showurlinline) {
-			if (!tagcmp("link", ref->type))
+			if (ref->tagid == TagA)
 				hprintf("[%s]", ref->url);
 			else
 				hprintf("[%s: %s]", ref->type, ref->url);
@@ -1687,7 +1708,7 @@ static void
 xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 {
 	struct tag *found, *tag;
-	char *child, *childs[16];
+	enum TagId child, childs[16];
 	size_t nchilds;
 	int i, j, k, nchildfound, parenttype;
 
@@ -1701,35 +1722,39 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 	   in reality the optional tag rules are more complex, see:
            https://html.spec.whatwg.org/multipage/syntax.html#optional-tags */
 
-	child = NULL;
+	child = 0;
 	nchilds = 0;
 	nchildfound = 0;
-	parenttype = 0;
+	parenttype = 0; /* by default, seek until the root */
 
 	if (found && found->displaytype & DisplayPre) {
 		skipinitialws = 0; /* do not skip white-space, for margins */
 	} else if (found && found->displaytype & DisplayList) {
-		childs[0] = "li";
+		childs[0] = TagLi;
 		nchilds = 1;
 		parenttype = DisplayList;
 	} else if (found && found->displaytype & DisplayTableRow) {
-		childs[0] = "td";
+		childs[0] = TagTd;
 		nchilds = 1;
 		parenttype = DisplayTableRow;
 	} else if (found && found->displaytype & DisplayTable) {
-		childs[0] = "td";
+		childs[0] = TagTd;
 		nchilds = 1;
 		parenttype = DisplayTable;
 	} else if (found && found->displaytype & DisplaySelect) {
-		childs[0] = "option";
+		childs[0] = TagOption;
 		nchilds = 1;
 		parenttype = DisplaySelect;
 	} else if (found && found->displaytype & DisplayDl) {
-		childs[0] = "p";
-		childs[1] = "dd";
-		childs[2] = "dt";
+		childs[0] = TagP;
+		childs[1] = TagDd;
+		childs[2] = TagDt;
 		nchilds = 3;
 		parenttype = DisplayDl;
+	} else if (found && found->displaytype & DisplayBlock) {
+		childs[0] = TagP;
+		nchilds = 1;
+		parenttype = 0; /* seek until the root */
 	}
 
 	if (nchilds > 0) {
@@ -1740,7 +1765,7 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 				break;
 			for (j = 0; j < nchilds; j++) {
 				child = childs[j];
-				if (!tagcmp(nodes[i].tag.name, child)) {
+				if (nodes[i].tag.id == child) {
 					/* fake closing the previous tags */
 					for (k = curnode; k >= i; k--)
 						endnode(&nodes[k]);
@@ -1794,7 +1819,8 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 {
 	struct tag *found;
 	struct node *cur;
-	char *child, *childs[16];
+	enum TagId tagid;
+	enum TagId child, childs[16];
 	size_t nchilds;
 	char *s;
 	int i, j, k, nchildfound, parenttype;
@@ -1821,55 +1847,56 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	   in reality the optional tag rules are more complex, see:
            https://html.spec.whatwg.org/multipage/syntax.html#optional-tags */
 
-	child = NULL;
+	child = 0;
 	nchilds = 0;
 	nchildfound = 0;
-	parenttype = 0;
+	parenttype = 0; /* by default, seek until the root */
 
 	/* if optional tag <p> is open and a list element is found, close </p>. */
 	if (found && found->displaytype & DisplayList) {
 		/* not inside a list */
-		childs[0] = "p";
+		childs[0] = TagP;
 		nchilds = 1;
 		parenttype = DisplayList;
 	} else if (found && found->isoptional) {
-		if (!tagcmp(t, "li")) {
-			childs[0] = "li";
+		tagid = found->id;
+		if (tagid == TagLi) {
+			childs[0] = TagLi;
 			nchilds = 1;
 			parenttype = DisplayList;
-		} else if (!tagcmp(t, "td")) {
-			childs[0] = "td";
+		} else if (tagid == TagTd) {
+			childs[0] = TagTd;
 			nchilds = 1;
 			parenttype = DisplayTableRow;
-		} else if (!tagcmp(t, "tr")) {
-			childs[0] = "tr";
+		} else if (tagid == TagTr) {
+			childs[0] = TagTr;
 			nchilds = 1;
 			parenttype = DisplayTable;
-		} else if (!tagcmp(t, "p")) {
-			childs[0] = "p";
+		} else if (tagid == TagP) {
+			childs[0] = TagP;
 			nchilds = 1;
 			parenttype = 0; /* seek until the root */
-		} else if (!tagcmp(t, "option")) {
-			childs[0] = "option";
+		} else if (tagid == TagOption) {
+			childs[0] = TagOption;
 			nchilds = 1;
 			parenttype = DisplaySelect;
-		} else if (!tagcmp(t, "dt")) {
-			childs[0] = "dd";
+		} else if (tagid == TagDt) {
+			childs[0] = TagDd;
 			nchilds = 1;
 			parenttype = DisplayDl;
-		} else if (!tagcmp(t, "dd")) {
-			childs[0] = "dd";
-			childs[1] = "dt";
+		} else if (tagid == TagDd) {
+			childs[0] = TagDd;
+			childs[1] = TagDt;
 			nchilds = 2;
 			parenttype = DisplayDl;
-		} else if (!tagcmp(t, cur->tag.name)) {
+		} else if (tagid == cur->tag.id) {
 			/* fake closing the previous tag if it is the same and repeated */
 			xmltagend(p, t, tl, 0);
 		}
 	} else if (found && found->displaytype & DisplayBlock) {
 		/* check if we have an open "<p>" tag */
-		childs[0] = "p";
-		childs[1] = "dl";
+		childs[0] = TagP;
+		childs[1] = TagDl;
 		nchilds = 2;
 		parenttype = DisplayDl;
 	}
@@ -1882,7 +1909,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 				break;
 			for (j = 0; j < nchilds; j++) {
 				child = childs[j];
-				if (!tagcmp(nodes[i].tag.name, child)) {
+				if (nodes[i].tag.id == child) {
 					/* fake closing the previous tags */
 					for (k = curnode; k >= i; k--)
 						xmltagend(p, nodes[k].tag.name, strlen(nodes[k].tag.name), 0);
@@ -1917,19 +1944,26 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 static void
 xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 {
+	struct tag *found;
+	enum TagId tagid;
 	struct node *cur, *parent;
 	int i, margintop;
+
+	/* match tag */
+	tagid = 0;
+	if ((found = findtag(t)))
+		tagid = found->id;
 
 	/* temporary replace the callback except the reader and end of tag
 	   restore the context once we receive the same ignored tag in the
 	   end tag handler */
-	if (!tagcmp(t, "script")) {
+	if (tagid == TagScript) {
 		ignorestate = endtag = "</script>";
 		getnext = p->getnext; /* for restore */
 		p->getnext = getnext_ignore;
 		xmltagend(p, t, tl, 0); /* fake the call the tag was ended */
 		return;
-	} else if (!tagcmp(t, "style")) {
+	} else if (tagid == TagStyle) {
 		ignorestate = endtag = "</style>";
 		getnext = p->getnext; /* for restore */
 		p->getnext = getnext_ignore;
@@ -2089,12 +2123,12 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 	   the node */
 	cur->hasdata = 0;
 
-	if (!tagcmp(t, "hr")) { /* ruler */
+	if (tagid == TagHr) { /* ruler */
 		i = termwidth - indent - defaultindent;
 		for (; i > 0; i--)
 			hprint(str_ruler);
 		cur->hasdata = 1; /* treat <hr/> as data */
-	} else if (!tagcmp(t, "br")) {
+	} else if (tagid == TagBr) {
 		hflush();
 		hadnewline = 0; /* forced newline */
 		hputchar('\n');
@@ -2107,65 +2141,78 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 }
 
 static void
-xmlattr(XMLParser *p, const char *tag, size_t taglen, const char *name,
-        size_t namelen, const char *value, size_t valuelen)
+xmlattr(XMLParser *p, const char *t, size_t tl, const char *n,
+        size_t nl, const char *v, size_t vl)
 {
 	struct node *cur;
+	enum TagId tagid;
 
 	cur = &nodes[curnode];
-
-	if (!attrcmp(name, "class"))
-		string_append(&attr_class, value, valuelen);
-	else if (!attrcmp(name, "id"))
-		string_append(&attr_id, value, valuelen);
-
-	/* <base href="..." /> */
-	if (!basehrefset && !attrcmp(name, "href") && !tagcmp(tag, "base"))
-		strlcat(basehrefdoc, value, sizeof(basehrefdoc));
+	tagid = cur->tag.id;
 
 	/* hide tags with attribute aria-hidden or hidden */
-	if (!attrcmp(name, "aria-hidden") || !attrcmp(name, "hidden"))
+	if (!attrcmp(n, "aria-hidden") || !attrcmp(n, "hidden"))
 		cur->tag.displaytype |= DisplayNone;
 
-	if (!tagcmp(tag, "select") && !attrcmp(name, "multiple"))
+	if (!attrcmp(n, "class"))
+		string_append(&attr_class, v, vl);
+	else if (!attrcmp(n, "id"))
+		string_append(&attr_id, v, vl);
+	else if (!attrcmp(n, "type"))
+		string_append(&attr_type, v, vl);
+	else if (!attrcmp(n, "value"))
+		string_append(&attr_value, v, vl);
+
+	/* <base href="..." /> */
+	if (!basehrefset && tagid == TagBase && !attrcmp(n, "href"))
+		strlcat(basehrefdoc, v, sizeof(basehrefdoc));
+
+	if (tagid == TagA && !attrcmp(n, "href"))
+		string_append(&attr_href, v, vl);
+
+	if (tagid == TagSelect && !attrcmp(n, "multiple"))
 		cur->tag.displaytype |= DisplaySelectMulti;
 
-	if (!tagcmp(tag, "a") && !attrcmp(name, "href"))
-		string_append(&attr_href, value, valuelen);
-
-	if (!tagcmp(tag, "object") && !attrcmp(name, "data"))
-		string_append(&attr_data, value, valuelen);
-
-	if ((!tagcmp(tag, "img") || !tagcmp(tag, "video") ||
-	     !tagcmp(tag, "source") || !tagcmp(tag, "track") ||
-	     !tagcmp(tag, "audio")) &&
-	     !attrcmp(name, "src") && valuelen)
-		string_append(&attr_src, value, valuelen);
+	if (tagid == TagObject && !attrcmp(n, "data"))
+		string_append(&attr_data, v, vl);
 
 	/* show img alt attribute as text. */
-	if (!tagcmp(tag, "img") && !attrcmp(name, "alt"))
-		string_append(&attr_alt, value, valuelen);
+	if (tagid == TagImg && !attrcmp(n, "alt"))
+		string_append(&attr_alt, v, vl);
 
-	if (!attrcmp(name, "checked"))
-		string_append(&attr_checked, value, valuelen);
-	else if (!attrcmp(name, "type"))
-		string_append(&attr_type, value, valuelen);
-	else if (!attrcmp(name, "value"))
-		string_append(&attr_value, value, valuelen);
+	if (cur->tag.displaytype & DisplayInput && !attrcmp(n, "checked"))
+		string_append(&attr_checked, v, vl);
+
+	/* src attribute */
+	switch (tagid) {
+	case TagAudio:
+	case TagEmbed:
+	case TagFrame:
+	case TagIframe:
+	case TagImg:
+	case TagSource:
+	case TagTrack:
+	case TagVideo:
+		if (!attrcmp(n, "src"))
+			string_append(&attr_src, v, vl);
+		break;
+	default:
+		break;
+	}
 }
 
 static void
-xmlattrentity(XMLParser *p, const char *tag, size_t taglen, const char *name,
-	size_t namelen, const char *value, size_t valuelen)
+xmlattrentity(XMLParser *p, const char *t, size_t tl, const char *n,
+	size_t nl, const char *v, size_t vl)
 {
 	char buf[16];
-	int n;
+	int len;
 
-	n = xml_entitytostr(value, buf, sizeof(buf));
-	if (n > 0)
-		xmlattr(p, tag, taglen, name, namelen, buf, (size_t)n);
+	len = xml_entitytostr(v, buf, sizeof(buf));
+	if (len > 0)
+		xmlattr(p, t, tl, n, nl, buf, (size_t)len);
 	else
-		xmlattr(p, tag, taglen, name, namelen, value, valuelen);
+		xmlattr(p, t, tl, n, nl, v, vl);
 }
 
 static void
@@ -2173,12 +2220,14 @@ xmlattrend(XMLParser *p, const char *t, size_t tl, const char *n,
 	size_t nl)
 {
 	struct node *cur;
+	enum TagId tagid;
 
 	cur = &nodes[curnode];
+	tagid = cur->tag.id;
 
 	/* set base URL, if it is set it cannot be overwritten again */
 	if (!basehrefset && basehrefdoc[0] &&
-	    !attrcmp(n, "href") && !tagcmp(t, "base"))
+	    tagid == TagBase && !attrcmp(n, "href"))
 		basehrefset = uri_parse(basehrefdoc, &base) != -1 ? 1 : 0;
 
 	/* if attribute checked is set but it has no value then set it to "checked" */
@@ -2190,6 +2239,12 @@ static void
 xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 	size_t nl)
 {
+	struct node *cur;
+	enum TagId tagid;
+
+	cur = &nodes[curnode];
+	tagid = cur->tag.id;
+
 	if (!attrcmp(n, "alt"))
 		string_clear(&attr_alt);
 	else if (!attrcmp(n, "checked"))
@@ -2209,7 +2264,7 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 	else if (!attrcmp(n, "value"))
 		string_clear(&attr_value);
 
-	if (basehrefdoc[0] && !attrcmp(n, "href") && !tagcmp(t, "base"))
+	if (basehrefdoc[0] && tagid == TagBase && !attrcmp(n, "href"))
 		basehrefdoc[0] = '\0';
 }
 
@@ -2236,7 +2291,8 @@ main(int argc, char **argv)
 		break;
 	case 'b':
 		basehref = EARGF(usage());
-		if (uri_parse(basehref, &base) == -1)
+		if (uri_parse(basehref, &base) == -1 ||
+		    !base.proto[0])
 			usage();
 		basehrefset = 1;
 		break;
