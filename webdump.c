@@ -10,6 +10,7 @@
 #include "arg.h"
 char *argv0;
 
+#include "tree.h"
 #include "xml.h"
 
 static XMLParser parser;
@@ -151,19 +152,31 @@ struct selectors {
 	size_t count;
 };
 
-/* linked-list of link references */
+/* RB tree of link references */
 struct linkref {
 	char *type;
 	enum TagId tagid;
 	char *url;
 	int ishidden;
 	size_t linknr;
-	struct linkref *next;
+	RB_ENTRY(linkref) entry;
 };
 
-static struct linkref *links_head;
-static struct linkref *links_cur;
-static int linkcount; /* visible link count */
+/* link references and hidden link references */
+struct linkref **visrefs;
+static size_t nvisrefs, ncapvisrefs; /* visible link count / capacity */
+struct linkref **hiddenrefs;
+static size_t nhiddenrefs, ncaphiddenrefs; /* hidden link count / capacity */
+
+int
+linkrefcmp(struct linkref *r1, struct linkref *r2)
+{
+	return strcmp(r1->url, r2->url);
+}
+
+RB_HEAD(linkreftree, linkref) linkrefhead = RB_INITIALIZER(&linkrefhead);
+RB_PROTOTYPE(linkreftree, linkref, entry, linkrefcmp)
+RB_GENERATE(linkreftree, linkref, entry, linkrefcmp)
 
 static const char *str_bullet_item = "* ";
 static const char *str_checkbox_checked = "x";
@@ -213,10 +226,11 @@ static char rbuf[1024];
 static int rbuflen;
 static int rnbufcells = 0; /* pending cell count to add */
 
-#define MAX_DEPTH 256
-static struct node nodes[MAX_DEPTH];
-static String nodes_links[MAX_DEPTH]; /* keep track of links per node */
-static int curnode;
+#define MAX_NODE_DEPTH 65535 /* absolute maximum node depth */
+static struct node *nodes;
+static String *nodes_links; /* keep track of links per node */
+static size_t ncapnodes;
+static int curnode; /* current node depth */
 
 /* reader / selector mode */
 static int reader_mode = 0;
@@ -1378,39 +1392,59 @@ handleinlinealt(void)
 	}
 }
 
-/* slow linear lookup of link references
-   TODO: optimize it, maybe using tree.h RB_TREE? */
+/* lookup a link reference by url in the red-black tree */
 static struct linkref *
 findlinkref(const char *url)
 {
-	struct linkref *cur;
+	struct linkref find;
 
-	for (cur = links_head; cur; cur = cur->next) {
-		if (!strcmp(url, cur->url))
-			return cur;
-	}
-	return NULL;
+	find.url = (char *)url;
+
+	return RB_FIND(linkreftree, &linkrefhead, &find);
 }
 
+/* add a link reference. Returns the added link reference, or the existing link
+   reference if links are deduplicated */
 static struct linkref *
-addlinkref(const char *url, const char *_type, enum TagId tagid, int ishidden,
-	int linknr)
+addlinkref(const char *url, const char *_type, enum TagId tagid, int ishidden)
 {
+	struct linkref *link;
+	size_t linknr;
+
+	/* if links are deduplicates return the existing link */
+	if (uniqrefs && (link = findlinkref(url)))
+		return link;
+
 	if (tagid == TagA)
 		_type = "link";
 
-	/* add to linked list */
-	if (!links_head)
-		links_cur = links_head = ecalloc(1, sizeof(*links_head));
-	else
-		links_cur = links_cur->next = ecalloc(1, sizeof(*links_head));
-	links_cur->url = estrdup(url);
-	links_cur->type = estrdup(_type);
-	links_cur->tagid = tagid;
-	links_cur->ishidden = ishidden;
-	links_cur->linknr = linknr;
+	link = ecalloc(1, sizeof(*link));
 
-	return links_cur;
+	if (!ishidden) {
+		linknr = ++nvisrefs;
+		if (nvisrefs >= ncapvisrefs)
+			ncapvisrefs += 256; /* greedy alloc */
+		visrefs = erealloc(visrefs, sizeof(*visrefs) * ncapvisrefs);
+		visrefs[linknr - 1] = link; /* add pointer to list */
+	} else {
+		linknr = ++nhiddenrefs;
+		if (nhiddenrefs >= ncaphiddenrefs)
+			ncaphiddenrefs += 256; /* greedy alloc */
+		hiddenrefs = erealloc(hiddenrefs, sizeof(*hiddenrefs) * ncaphiddenrefs);
+		hiddenrefs[linknr - 1] = link; /* add pointer to list */
+	}
+
+	link->url = estrdup(url);
+	link->type = estrdup(_type);
+	link->tagid = tagid;
+	link->ishidden = ishidden;
+	link->linknr = linknr;
+
+	/* add to tree: the tree is only used for checking unique link references */
+	if (uniqrefs)
+		RB_INSERT(linkreftree, &linkrefhead, link);
+
+	return link;
 }
 
 static void
@@ -1462,43 +1496,65 @@ handleinlinelink(void)
 	/* add hidden links directly to the reference,
 	   the order doesn't matter */
 	if (cur->tag.displaytype & DisplayNone)
-		addlinkref(url, cur->tag.name, cur->tag.id, 1, 0);
+		addlinkref(url, cur->tag.name, cur->tag.id, 1);
 }
 
 void
 printlinkrefs(void)
 {
+	struct linkref *ref;
 	size_t i;
-	int hashiddenrefs = 0;
 
-	if (!links_head)
+	if (!nvisrefs && !nhiddenrefs)
 		return;
 
 	if (resources) {
-		for (i = 1, links_cur = links_head; links_cur; links_cur = links_cur->next, i++)
-			dprintf(3, "%s\t%s\n", links_cur->type, links_cur->url);
+		for (i = 0; i < nvisrefs; i++) {
+			ref = visrefs[i];
+			dprintf(3, "%s\t%s\n", ref->type, ref->url);
+		}
+		for (i = 0; i < nhiddenrefs; i++) {
+			ref = hiddenrefs[i];
+			dprintf(3, "%s\t%s\n", ref->type, ref->url);
+		}
 	}
 
 	printf("\nReferences\n\n");
 
-	i = 1;
-	for (links_cur = links_head; links_cur; links_cur = links_cur->next) {
-		if (links_cur->ishidden) {
-			hashiddenrefs = 1;
-			continue;
-		}
-		printf(" %zu. %s (%s)\n", links_cur->linknr, links_cur->url, links_cur->type);
-		i++;
+	for (i = 0; i < nvisrefs; i++) {
+		ref = visrefs[i];
+		printf(" %zu. %s (%s)\n", ref->linknr, ref->url, ref->type);
 	}
 
-	if (hashiddenrefs)
+	if (nhiddenrefs > 0)
 		printf("\n\nHidden references\n\n");
 	/* hidden links don't have a link number, just count them */
-	for (links_cur = links_head; links_cur; links_cur = links_cur->next) {
-		if (!links_cur->ishidden)
-			continue;
-		printf(" %zu. %s (%s)\n", i, links_cur->url, links_cur->type);
-		i++;
+	for (i = 0; i < nhiddenrefs; i++) {
+		ref = hiddenrefs[i];
+		printf(" %zu. %s (%s)\n", ref->linknr, ref->url, ref->type);
+	}
+}
+
+#define NODE_CAP_INC 256
+
+/* increase node depth, allocate space for nodes if needed */
+static void
+incnode(void)
+{
+	curnode++;
+
+	if (curnode >= MAX_NODE_DEPTH)
+		errx(1, "max node depth reached: %d", curnode);
+
+	if (curnode >= ncapnodes) {
+		nodes = erealloc(nodes, sizeof(*nodes) * (ncapnodes + NODE_CAP_INC));
+		nodes_links = erealloc(nodes_links, sizeof(*nodes_links) * (ncapnodes + NODE_CAP_INC));
+
+		/* clear new region */
+		memset(&nodes[ncapnodes], 0, sizeof(*nodes) * NODE_CAP_INC);
+		memset(&nodes_links[ncapnodes], 0, sizeof(*nodes_links) * NODE_CAP_INC);
+
+		ncapnodes += NODE_CAP_INC; /* greedy alloc */
 	}
 }
 
@@ -1670,17 +1726,8 @@ endnode(struct node *cur)
 
 	/* add link and show the link number in the visible order */
 	if (!ishidden && nodes_links[curnode].len > 0) {
-		if (uniqrefs)
-			ref = findlinkref(nodes_links[curnode].data);
-		else
-			ref = NULL;
-
-		/* new link: add it */
-		if (!ref) {
-			linkcount++;
-			ref = addlinkref(nodes_links[curnode].data,
-				cur->tag.name, cur->tag.id, ishidden, linkcount);
-		}
+		ref = addlinkref(nodes_links[curnode].data,
+			cur->tag.name, cur->tag.id, ishidden);
 
 		if (showrefinline || showurlinline) {
 			hflush();
@@ -1825,9 +1872,6 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	char *s;
 	int i, j, k, nchildfound, parenttype;
 
-	if (curnode >= MAX_DEPTH - 2)
-		errx(1, "max tag depth reached: %d\n", curnode);
-
 	cur = &nodes[curnode];
 
 	string_clear(&attr_alt);
@@ -1920,7 +1964,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 		}
 	}
 
-	curnode++;
+	incnode();
 	string_clear(&nodes_links[curnode]); /* clear possible link reference for this node */
 	cur = &nodes[curnode];
 	memset(cur, 0, sizeof(*cur)); /* clear / reset node */
@@ -2332,6 +2376,11 @@ main(int argc, char **argv)
 	default:
 		usage();
 	} ARGEND
+
+	/* initial nodes */
+	ncapnodes = NODE_CAP_INC;
+	nodes = ecalloc(ncapnodes, sizeof(*nodes));
+	nodes_links = ecalloc(ncapnodes, sizeof(*nodes_links));
 
 	/* top-most document root needs initialization */
 	nodes[0].tag.name = "";
