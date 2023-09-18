@@ -1,5 +1,5 @@
-#ifndef _XML_H_
-#define _XML_H_
+#ifndef XML_H
+#define XML_H
 
 #include <stdio.h>
 
@@ -36,7 +36,7 @@ typedef struct xmlparser {
 	/* current tag */
 	char tag[1024];
 	size_t taglen;
-	/* current tag is in shortform ? <tag /> */
+	/* current tag is in short tag ? <tag /> */
 	int isshorttag;
 	/* current attribute name */
 	char name[1024];

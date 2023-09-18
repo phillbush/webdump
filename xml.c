@@ -370,7 +370,7 @@ xml_parse(XMLParser *x)
 				x->taglen = 1;
 				x->isshorttag = isend = 0;
 
-				/* treat processing instruction as shorttag, don't strip "?" prefix. */
+				/* treat processing instruction as short tag, don't strip "?" prefix. */
 				if (c == '?') {
 					x->isshorttag = 1;
 				} else if (c == '/') {
@@ -399,7 +399,7 @@ xml_parse(XMLParser *x)
 							if (x->xmltagstartparsed)
 								x->xmltagstartparsed(x, x->tag, x->taglen, x->isshorttag);
 						}
-						/* call tagend for shortform or processing instruction */
+						/* call tagend for short tag or processing instruction */
 						if (x->isshorttag) {
 							if (x->xmltagend)
 								x->xmltagend(x, x->tag, x->taglen, x->isshorttag);
