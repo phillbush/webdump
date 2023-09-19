@@ -45,14 +45,14 @@ struct uri {
 };
 
 /* options */
-static int allowansi     = 0;  /* allow ANSI escape codes */
-static int showrefbottom = 0;  /* show link references at the bottom */
-static int showrefinline = 0;  /* show link reference number inline */
-static int showurlinline = 0;  /* show full link reference inline */
-static int linewrap      = 0;  /* line-wrapping */
-static int termwidth     = 77; /* terminal width */
-static int resources     = 0;  /* write resources line-by-line to fd 3? */
-static int uniqrefs      = 0;  /* number unique references */
+static int allowansi     = 0;  /* (-a) allow ANSI escape codes */
+static int uniqrefs      = 0;  /* (-d) number unique references */
+static int showrefinline = 0;  /* (-i) show link reference number inline */
+static int showurlinline = 0;  /* (-I) show full link reference inline */
+static int showrefbottom = 0;  /* (-l) show link references at the bottom */
+static int linewrap      = 0;  /* (-r) line-wrapping */
+static int termwidth     = 77; /* (-w) terminal width */
+static int resources     = 0;  /* (-x) write resources line-by-line to fd 3? */
 
 enum DisplayType {
 	DisplayUnknown     = 0,
@@ -95,17 +95,19 @@ typedef struct string {
 } String;
 
 enum TagId { TagA = 1, TagAddress, TagArea, TagArticle, TagAside, TagAudio,
-TagB, TagBase, TagBlink, TagBlockquote, TagBody, TagBr, TagButton, TagCite,
-TagCol, TagColgroup, TagDatalist, TagDd, TagDel, TagDetails, TagDfn, TagDir,
-TagDiv, TagDl, TagDt, TagEm, TagEmbed, TagFieldset, TagFigcaption, TagFigure,
-TagFooter, TagForm, TagFrame, TagH1, TagH2, TagH3, TagH4, TagH5, TagH6,
-TagHead, TagHeader, TagHr, TagHtml, TagI, TagIframe, TagImg, TagInput, TagIns,
-TagLabel, TagLegend, TagLi, TagLink, TagMain, TagMark, TagMenu, TagMeta,
-TagNav, TagObject, TagOl, TagOption, TagP, TagParam, TagPre, TagS, TagScript,
-TagSearch, TagSection, TagSelect, TagSource, TagStrike, TagStrong, TagStyle,
-TagSummary, TagTable, TagTbody, TagTd, TagTemplate, TagTextarea, TagTfoot,
-TagTh, TagThead, TagTitle, TagTr, TagTrack, TagU, TagUl, TagVar, TagVideo,
-TagWbr, TagXmp };
+
+	TagB, TagBase, TagBlink, TagBlockquote, TagBody, TagBr, TagButton,
+	TagCite, TagCol, TagColgroup, TagDatalist, TagDd, TagDel, TagDetails,
+	TagDfn, TagDir, TagDiv, TagDl, TagDt, TagEm, TagEmbed, TagFieldset,
+	TagFigcaption, TagFigure, TagFooter, TagForm, TagFrame, TagH1, TagH2,
+	TagH3, TagH4, TagH5, TagH6, TagHead, TagHeader, TagHr, TagHtml, TagI,
+	TagIframe, TagImg, TagInput, TagIns, TagLabel, TagLegend, TagLi,
+	TagLink, TagMain, TagMark, TagMenu, TagMeta, TagNav, TagObject, TagOl,
+	TagOption, TagP, TagParam, TagPre, TagS, TagScript, TagSearch,
+	TagSection, TagSelect, TagSource, TagStrike, TagStrong, TagStyle,
+	TagSummary, TagTable, TagTbody, TagTd, TagTemplate, TagTextarea,
+	TagTfoot, TagTh, TagThead, TagTitle, TagTr, TagTrack, TagU, TagUl,
+	TagVar, TagVideo, TagWbr, TagXmp };
 
 struct tag {
 	const char *name;
@@ -168,6 +170,7 @@ static size_t nvisrefs, ncapvisrefs; /* visible link count / capacity */
 struct linkref **hiddenrefs;
 static size_t nhiddenrefs, ncaphiddenrefs; /* hidden link count / capacity */
 
+/* compare link by URL for link references RB-tree */
 int
 linkrefcmp(struct linkref *r1, struct linkref *r2)
 {
@@ -175,7 +178,6 @@ linkrefcmp(struct linkref *r1, struct linkref *r2)
 }
 
 RB_HEAD(linkreftree, linkref) linkrefhead = RB_INITIALIZER(&linkrefhead);
-RB_PROTOTYPE(linkreftree, linkref, entry, linkrefcmp)
 RB_GENERATE(linkreftree, linkref, entry, linkrefcmp)
 
 static const char *str_bullet_item = "* ";
@@ -184,10 +186,9 @@ static const char *str_ruler = "-";
 static const char *str_radio_checked = "*";
 
 /* base href, to make URLs absolute */
-static char *basehref = "";
-static char basehrefdoc[4096]; /* base href in document, if any */
-static int basehrefset = 0; /* base href set and can be used? */
-static struct uri base;
+static char basehrefdoc[4096]; /* buffer for base href in document, if any */
+static int basehrefset; /* base href set and can be used? */
+static struct uri base; /* parsed current base href */
 
 /* buffers for some attributes of the current tag */
 String attr_alt; /* alt attribute */
@@ -200,7 +201,7 @@ String attr_src; /* src attribute */
 String attr_type; /* type attribute */
 String attr_value; /* value attribute */
 
-static String htmldata;
+static String htmldata; /* buffered HTML data near the current tag */
 
 /* for white-space output handling:
    1 = whitespace emitted (suppress repeated), 2 = other characters on this line
@@ -208,15 +209,15 @@ static String htmldata;
    * White-space data before non-whitespace data in tags are ignored on a line.
    * Repeated white-space are ignored: a single space (' ') is emitted.
 */
-static int whitespace_mode = 0;
-static int nbytesline = 0;
-static int ncells = 0; /* current cell count */
-static int hadnewline = 0; /* count for repeated newlines */
+static int whitespace_mode;
+static int nbytesline; /* bytes on this line */
+static int ncells; /* current cell/column count */
+static int hadnewline; /* count for repeated newlines */
 /* flag for skipping initial white-space in tag: for HTML white-space handling */
 static int skipinitialws = 1;
 #define DEFAULT_INDENT 2
-static const int defaultindent = DEFAULT_INDENT;
-static int indent;
+static const int defaultindent = DEFAULT_INDENT; /* default indent / margin */
+static int indent; /* indent for the current line, in columns */
 /* previous output sequential newlines, used for calculating margins between
    elements and reducing excessive newlines */
 static int currentnewlines;
@@ -224,21 +225,22 @@ static int currentnewlines;
 /* buffers for line-wrapping (buffer per word boundary) */
 static char rbuf[1024];
 static int rbuflen;
-static int rnbufcells = 0; /* pending cell count to add */
+static int rnbufcells; /* pending cell count to add */
 
 #define MAX_NODE_DEPTH 65535 /* absolute maximum node depth */
-static struct node *nodes;
+static struct node *nodes; /* node tree (one per level is remembered) */
 static String *nodes_links; /* keep track of links per node */
-static size_t ncapnodes;
+static size_t ncapnodes; /* current allocated node capacity */
 static int curnode; /* current node depth */
 
-/* reader / selector mode */
-static int reader_mode = 0;
-static int reader_ignore = 0;
+/* reader / selector mode (-s) */
+static int reader_mode;
+/* flag if the tags and their children should be ignored in the current context */
+static int reader_ignore;
 
-static enum MarkupType curmarkup;
+static enum MarkupType curmarkup; /* current markup state (bold, underline, etc) */
 
-/* selector to match */
+/* selector to match (for -s and -u) */
 static struct selectors *sel_hide, *sel_show;
 
 /* tags table: needs to be sorted like tagcmp(), alphabetically */
@@ -483,7 +485,7 @@ ecalloc(size_t nmemb, size_t size)
 }
 
 /* check if string has a non-empty scheme / protocol part */
-int
+static int
 uri_hasscheme(const char *s)
 {
 	const char *p = s;
@@ -495,7 +497,7 @@ uri_hasscheme(const char *s)
 	return (*p == ':' && p != s);
 }
 
-int
+static int
 uri_parse(const char *s, struct uri *u)
 {
 	const char *p = s;
@@ -611,7 +613,7 @@ parsepath:
 /* Transform and try to make the URI `u` absolute using base URI `b` into `a`.
    Follows some of the logic from "RFC 3986 - 5.2.2. Transform References".
    Returns 0 on success, -1 on error or truncation. */
-int
+static int
 uri_makeabs(struct uri *a, struct uri *u, struct uri *b)
 {
 	char *p;
@@ -663,7 +665,7 @@ uri_makeabs(struct uri *a, struct uri *u, struct uri *b)
 	return 0;
 }
 
-int
+static int
 uri_format(char *buf, size_t bufsiz, struct uri *u)
 {
 	return snprintf(buf, bufsiz, "%s%s%s%s%s%s%s%s%s%s%s%s",
@@ -682,14 +684,14 @@ uri_format(char *buf, size_t bufsiz, struct uri *u)
 }
 
 /* compare tag name (case-insensitive) */
-int
+static int
 tagcmp(const char *s1, const char *s2)
 {
 	return strcasecmp(s1, s2);
 }
 
 /* compare attribute name (case-insensitive) */
-int
+static int
 attrcmp(const char *s1, const char *s2)
 {
 	return strcasecmp(s1, s2);
@@ -846,7 +848,7 @@ endmarkup(int markuptype)
    cell in general.
    NOTE: this is of course incorrect since characters can be 2 width aswell,
    in the future maybe replace this with wcwidth() or similar */
-int
+static int
 utfwidth(int c)
 {
 	/* not the start of a codepoint */
@@ -1002,17 +1004,6 @@ parentcontainerhasdata(int curtype, int n)
 	return 0;
 }
 
-static int
-parenthasdata(int n)
-{
-	int i;
-
-	for (i = n; i >= 0; i--)
-		return nodes[i].hasdata;
-
-	return 0;
-}
-
 /* start on a newline for the start of a block element or not */
 static void
 startblock(void)
@@ -1021,7 +1012,7 @@ startblock(void)
 	whitespace_mode &= ~2; /* no characters on this line yet */
 	if (nbytesline <= 0)
 		return;
-	if (!hadnewline && parenthasdata(curnode - 1))
+	if (!hadnewline && curnode >= 0 && nodes[curnode - 1].hasdata)
 		hputchar('\n');
 }
 
@@ -1137,7 +1128,7 @@ findparenttype(int cur, int findtype)
 	return NULL;
 }
 
-int
+static int
 isclassmatch(const char *haystack, const char *needle)
 {
 	const char *p;
@@ -1165,7 +1156,7 @@ isclassmatch(const char *haystack, const char *needle)
 
 /* very limited CSS-like selector, supports: main, main#id, main.class,
    ".class", "#id", "ul li a" */
-int
+static int
 compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 {
 	int depth = 0, len;
@@ -1263,7 +1254,7 @@ compileselector(const char *sel, struct selectornode *nodes, size_t maxnodes)
 	return depth;
 }
 
-struct selector *
+static struct selector *
 newselector(const char *q)
 {
 	struct selector *sel;
@@ -1282,7 +1273,7 @@ newselector(const char *q)
 	return sel;
 }
 
-struct selectors *
+static struct selectors *
 compileselectors(const char *q)
 {
 	struct selectors *sels = NULL;
@@ -1319,7 +1310,7 @@ compileselectors(const char *q)
 
 /* very limited CSS-like matcher, supports: main, main#id, main.class,
    ".class", "#id", "ul li a" */
-int
+static int
 iscssmatch(struct selector *sel, struct node *root, int maxdepth)
 {
 	int d, md = 0;
@@ -1356,7 +1347,7 @@ iscssmatch(struct selector *sel, struct node *root, int maxdepth)
 	return 0;
 }
 
-int
+static int
 iscssmatchany(struct selectors *sels, struct node *root, int maxdepth)
 {
 	struct selector *sel;
@@ -1499,7 +1490,7 @@ handleinlinelink(void)
 		addlinkref(url, cur->tag.name, cur->tag.id, 1);
 }
 
-void
+static void
 printlinkrefs(void)
 {
 	struct linkref *ref;
@@ -1535,6 +1526,7 @@ printlinkrefs(void)
 	}
 }
 
+/* size to grow node capacity (greedy) */
 #define NODE_CAP_INC 256
 
 /* increase node depth, allocate space for nodes if needed */
@@ -1759,6 +1751,7 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 	size_t nchilds;
 	int i, j, k, nchildfound, parenttype;
 
+	/* match tag and lookup metadata */
 	/* ignore closing of void elements, like </br>, which is not allowed */
 	if ((found = findtag(t))) {
 		if (!isshort && found->isvoid)
@@ -1884,7 +1877,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	string_clear(&attr_type);
 	string_clear(&attr_value);
 
-	/* match tag */
+	/* match tag and lookup metadata */
 	found = findtag(t);
 
 	/* TODO: implement more complete optional tag handling.
@@ -1993,7 +1986,7 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 	struct node *cur, *parent;
 	int i, margintop;
 
-	/* match tag */
+	/* match tag and lookup metadata */
 	tagid = 0;
 	if ((found = findtag(t)))
 		tagid = found->id;
@@ -2322,6 +2315,8 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char *basehref;
+
 	if (pledge("stdio", NULL) < 0)
 		err(1, "pledge");
 
