@@ -191,15 +191,17 @@ static int basehrefset; /* base href set and can be used? */
 static struct uri base; /* parsed current base href */
 
 /* buffers for some attributes of the current tag */
-String attr_alt; /* alt attribute */
-String attr_checked; /* checked attribute */
-String attr_class; /* class attribute */
-String attr_data; /* data attribute */
-String attr_href; /* href attribute */
-String attr_id; /* id attribute */
-String attr_src; /* src attribute */
-String attr_type; /* type attribute */
-String attr_value; /* value attribute */
+static String attr_alt; /* alt attribute */
+static String attr_checked; /* checked attribute */
+static String attr_class; /* class attribute */
+static int attr_class_set; /* class attribute is set already */
+static String attr_data; /* data attribute */
+static String attr_href; /* href attribute */
+static String attr_id; /* id attribute */
+static int attr_id_set; /* class attribute is set already */
+static String attr_src; /* src attribute */
+static String attr_type; /* type attribute */
+static String attr_value; /* value attribute */
 
 static String htmldata; /* buffered HTML data near the current tag */
 
@@ -1870,9 +1872,11 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	string_clear(&attr_alt);
 	string_clear(&attr_checked);
 	string_clear(&attr_class);
+	attr_class_set = 0;
 	string_clear(&attr_data);
 	string_clear(&attr_href);
 	string_clear(&attr_id);
+	attr_id_set = 0;
 	string_clear(&attr_src);
 	string_clear(&attr_type);
 	string_clear(&attr_value);
@@ -2191,9 +2195,9 @@ xmlattr(XMLParser *p, const char *t, size_t tl, const char *n,
 	if (!attrcmp(n, "aria-hidden") || !attrcmp(n, "hidden"))
 		cur->tag.displaytype |= DisplayNone;
 
-	if (!attrcmp(n, "class"))
+	if (!attr_class_set && !attrcmp(n, "class")) /* use the first set attribute */
 		string_append(&attr_class, v, vl);
-	else if (!attrcmp(n, "id"))
+	else if (!attr_id_set && !attrcmp(n, "id")) /* use the first set attribute */
 		string_append(&attr_id, v, vl);
 	else if (!attrcmp(n, "type"))
 		string_append(&attr_type, v, vl);
@@ -2262,6 +2266,11 @@ xmlattrend(XMLParser *p, const char *t, size_t tl, const char *n,
 	cur = &nodes[curnode];
 	tagid = cur->tag.id;
 
+	if (!attr_class_set && !attrcmp(n, "class"))
+		attr_class_set = 1;
+	else if (!attr_id_set && !attrcmp(n, "id"))
+		attr_id_set = 1;
+
 	/* set base URL, if it is set it cannot be overwritten again */
 	if (!basehrefset && basehrefdoc[0] &&
 	    tagid == TagBase && !attrcmp(n, "href"))
@@ -2286,13 +2295,13 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 		string_clear(&attr_alt);
 	else if (!attrcmp(n, "checked"))
 		string_clear(&attr_checked);
-	else if (!attrcmp(n, "class"))
+	else if (!attr_class_set && !attrcmp(n, "class"))
 		string_clear(&attr_class);
 	else if (!attrcmp(n, "data"))
 		string_clear(&attr_data);
 	else if (!attrcmp(n, "href"))
 		string_clear(&attr_href);
-	else if (!attrcmp(n, "id"))
+	else if (!attr_id_set && !attrcmp(n, "id"))
 		string_clear(&attr_id);
 	else if (!attrcmp(n, "src"))
 		string_clear(&attr_src);
