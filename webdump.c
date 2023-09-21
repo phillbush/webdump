@@ -105,9 +105,9 @@ enum TagId { TagA = 1, TagAddress, TagArea, TagArticle, TagAside, TagAudio,
 	TagLink, TagMain, TagMark, TagMenu, TagMeta, TagNav, TagObject, TagOl,
 	TagOption, TagP, TagParam, TagPre, TagS, TagScript, TagSearch,
 	TagSection, TagSelect, TagSource, TagStrike, TagStrong, TagStyle,
-	TagSummary, TagTable, TagTbody, TagTd, TagTemplate, TagTextarea,
-	TagTfoot, TagTh, TagThead, TagTitle, TagTr, TagTrack, TagU, TagUl,
-	TagVar, TagVideo, TagWbr, TagXmp };
+	TagSummary, TagSvg, TagTable, TagTbody, TagTd, TagTemplate,
+	TagTextarea, TagTfoot, TagTh, TagThead, TagTitle, TagTr, TagTrack,
+	TagU, TagUl, TagVar, TagVideo, TagWbr, TagXmp };
 
 struct tag {
 	const char *name;
@@ -322,6 +322,7 @@ static struct tag tags[] = {
 { "strong",     TagStrong,     DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
 { "style",      TagStyle,      DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
 { "summary",    TagSummary,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
+{ "svg",        TagSvg,        DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
 { "table",      TagTable,      DisplayTable,                     0,               0,               0, 0, 0, 0, 0 },
 { "tbody",      TagTbody,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
 { "td",         TagTd,         DisplayTableCell,                 0,               DisplayTableRow, 0, 1, 0, 0, 0 },
