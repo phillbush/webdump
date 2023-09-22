@@ -95,7 +95,6 @@ typedef struct string {
 } String;
 
 enum TagId { TagA = 1, TagAddress, TagArea, TagArticle, TagAside, TagAudio,
-
 	TagB, TagBase, TagBlink, TagBlockquote, TagBody, TagBr, TagButton,
 	TagCite, TagCol, TagColgroup, TagDatalist, TagDd, TagDel, TagDetails,
 	TagDfn, TagDir, TagDiv, TagDl, TagDt, TagEm, TagEmbed, TagFieldset,
@@ -165,13 +164,13 @@ struct linkref {
 };
 
 /* link references and hidden link references */
-struct linkref **visrefs;
+static struct linkref **visrefs;
 static size_t nvisrefs, ncapvisrefs; /* visible link count / capacity */
-struct linkref **hiddenrefs;
+static struct linkref **hiddenrefs;
 static size_t nhiddenrefs, ncaphiddenrefs; /* hidden link count / capacity */
 
 /* compare link by URL for link references RB-tree */
-int
+static int
 linkrefcmp(struct linkref *r1, struct linkref *r2)
 {
 	return strcmp(r1->url, r2->url);
@@ -348,7 +347,7 @@ static struct tag tags[] = {
 #endif
 
 /* print to stderr, print error message of errno and exit(). */
-__dead void
+__dead static void
 err(int exitstatus, const char *fmt, ...)
 {
 	va_list ap;
@@ -369,7 +368,7 @@ err(int exitstatus, const char *fmt, ...)
 }
 
 /* print to stderr and exit(). */
-__dead void
+__dead static void
 errx(int exitstatus, const char *fmt, ...)
 {
 	va_list ap;
@@ -448,7 +447,7 @@ string_append(String *s, const char *data, size_t len)
 	s->data[s->len] = '\0';
 }
 
-char *
+static char *
 estrdup(const char *s)
 {
 	char *p;
@@ -458,7 +457,7 @@ estrdup(const char *s)
 	return p;
 }
 
-char *
+static char *
 estrndup(const char *s, size_t n)
 {
 	char *p;
@@ -468,7 +467,7 @@ estrndup(const char *s, size_t n)
 	return p;
 }
 
-void *
+static void *
 erealloc(void *p, size_t siz)
 {
 	if (!(p = realloc(p, siz)))
@@ -477,7 +476,7 @@ erealloc(void *p, size_t siz)
 	return p;
 }
 
-void *
+static void *
 ecalloc(size_t nmemb, size_t size)
 {
 	void *p;
@@ -1640,7 +1639,7 @@ xmlcdata(XMLParser *p, const char *data, size_t datalen)
 }
 
 /* lookup function to compare tag name (case-insensitive) for sort functions */
-int
+static int
 findtagcmp(const void *v1, const void *v2)
 {
 	struct tag *t1 = (struct tag *)v1;
@@ -1650,7 +1649,7 @@ findtagcmp(const void *v1, const void *v2)
 }
 
 /* binary search tag by tag name */
-struct tag *
+static struct tag *
 findtag(const char *t)
 {
 	struct tag find = { 0 };
@@ -2315,7 +2314,7 @@ xmlattrstart(XMLParser *p, const char *t, size_t tl, const char *n,
 		basehrefdoc[0] = '\0';
 }
 
-void
+static void
 usage(void)
 {
 	fprintf(stderr, "%s [-8adiIlrx] [-b basehref] [-s selector] [-u selector] [-w termwidth]\n", argv0);

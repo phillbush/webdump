@@ -250,7 +250,7 @@ struct namedentity {
 	long cp;
 };
 
-int
+static int
 namedentitycmp(const void *v1, const void *v2)
 {
 	struct namedentity *n1 = (struct namedentity *)v1;
