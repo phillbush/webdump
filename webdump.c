@@ -1382,6 +1382,10 @@ handleinlinealt(void)
 		for (s = start; s < e; s++)
 			printc((unsigned char)*s);
 		hflush();
+	} else if (cur->tag.id == TagImg && !showurlinline) {
+		/* if there is no alt text and no URL is shown inline, then
+		   show "[IMG]" to indicate there was an image there */
+		hprint("[IMG]");
 	}
 }
 
