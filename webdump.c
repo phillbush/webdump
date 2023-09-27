@@ -50,7 +50,7 @@ static int uniqrefs      = 0;  /* (-d) number unique references */
 static int showrefinline = 0;  /* (-i) show link reference number inline */
 static int showurlinline = 0;  /* (-I) show full link reference inline */
 static int showrefbottom = 0;  /* (-l) show link references at the bottom */
-static int linewrap      = 0;  /* (-r) line-wrapping */
+static int allowlinewrap = 0;  /* (-r) line-wrapping */
 static int termwidth     = 77; /* (-w) terminal width */
 static int resources     = 0;  /* (-x) write resources line-by-line to fd 3? */
 
@@ -240,6 +240,7 @@ static int reader_mode;
 static int reader_ignore;
 
 static enum MarkupType curmarkup; /* current markup state (bold, underline, etc) */
+static int linewrap; /* allow linewrap in this context */
 
 /* selector to match (for -s and -u) */
 static struct selectors *sel_hide, *sel_show;
@@ -1848,6 +1849,22 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 	}
 	indent = calcindent();
 
+#if 0
+	/* check if linewrap is enabled, but currently is disabled and needs to
+	   be restored */
+	if (allowlinewrap && !linewrap) {
+		tag = NULL;
+		for (i = curnode; i >= 0; i--) {
+			if (nodes[i].tag.id == TagTable) {
+				tag = &nodes[i].tag;
+				break;
+			}
+		}
+		if (!tag)
+			linewrap = allowlinewrap;
+	}
+#endif
+
 	/* restore markup of the tag we are in now */
 	startmarkup(nodes[curnode].tag.markuptype);
 
@@ -2015,6 +2032,12 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 		xmltagend(p, t, tl, 0); /* fake the call the tag was ended */
 		return;
 	}
+
+#if 0
+	/* disable line-wrapping inside tables */
+	if (tagid == TagTable)
+		linewrap = 0;
+#endif
 
 	cur = &nodes[curnode];
 
@@ -2361,7 +2384,7 @@ main(int argc, char **argv)
 		showrefbottom = !showrefbottom;
 		break;
 	case 'r':
-		linewrap = !linewrap;
+		allowlinewrap = !allowlinewrap;
 		break;
 	case 's':
 		sel_show = compileselectors(EARGF(usage()));
@@ -2384,6 +2407,8 @@ main(int argc, char **argv)
 	default:
 		usage();
 	} ARGEND
+
+	linewrap = allowlinewrap;
 
 	/* initial nodes */
 	ncapnodes = NODE_CAP_INC;
