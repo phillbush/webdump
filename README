@@ -34,11 +34,17 @@ Example:
 	curl -s "$url" | webdump -s 'main' -8 -a -i -l -r -b "$url" | less -R
 
 
+Yes, all these option flags look ugly, a shellscript wrapper could be used :)
+
+
 Goals / scope
 -------------
 
-The tool will only render HTML to stdout, similarly to links -dump or
-lynx -dump but simpler and more secure.
+The main goal is to use it for converting HTML mails to plain-text and to
+convert HTML content in RSS feeds to plain-text.
+
+The tool will only convert HTML to stdout, similarly to links -dump or lynx
+-dump but simpler and more secure.
 
 - HTML and XHTML will be supported.
 - There will be some workarounds and quirks for broken and legacy HTML code.
@@ -46,8 +52,11 @@ lynx -dump but simpler and more secure.
 - No remote resources which are part of the HTML will be downloaded:
   images, video, audio, etc. But these may be visible as a link reference.
 - Data will be written to stdout. Intended for plain-text or a text terminal.
-- No support for Javascript, CSS, frame rendering or forms.
+- No support for Javascript, CSS, frame rendering or form processing.
 - No HTTP or network protocol handling: HTML data is read from stdin.
+- Listings for references and some options to extract them in a list that is
+  usable for scripting. Some references are: link anchors, images, audio, video,
+  HTML (i)frames, etc.
 
 
 Features
@@ -60,6 +69,33 @@ Features
 - Show link references.
 - Show link references and resources such as img, video, audio, subtitles.
 - Export link references and resources to a TAB-separated format.
+
+
+Trade-offs
+----------
+
+All software has trade-offs.
+
+webdump processes HTML in a single-pass. It does not buffer the full DOM tree.
+Although due to the nature of HTML/XML some parts like attributes need to be
+buffered.
+
+Rendering tables in webdump is very limited. Twibright Links has really nice
+table rendering. Implementing a similar feature in the current design of
+webdump would make the code much more complex however. Twibright links
+processes a full DOM tree and processes the tables in multiple passes (to
+measure the table cells) etc.  Of course tables can be nested also, or is used
+in (older web) pages that use HTML tables for layout.
+
+These trade-offs and preferences are chosen for now. It may change in the
+future.  Fortunately there are the usual good suspects for HTML to plain-text
+conversion, (each with their own chosen trade-offs of course):
+
+For example:
+
+- twibright links
+- lynx
+- w3m
 
 
 Examples
