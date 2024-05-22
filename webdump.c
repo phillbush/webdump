@@ -228,7 +228,7 @@ static char rbuf[1024];
 static int rbuflen;
 static int rnbufcells; /* pending cell count to add */
 
-#define MAX_NODE_DEPTH 65535 /* absolute maximum node depth */
+#define MAX_NODE_DEPTH 4096 /* absolute maximum node depth */
 static struct node *nodes; /* node tree (one per level is remembered) */
 static String *nodes_links; /* keep track of links per node */
 static size_t ncapnodes; /* current allocated node capacity */
