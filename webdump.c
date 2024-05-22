@@ -1540,6 +1540,8 @@ printlinkrefs(void)
 static void
 incnode(void)
 {
+	size_t i;
+
 	curnode++;
 
 	if (curnode >= MAX_NODE_DEPTH)
@@ -1552,6 +1554,11 @@ incnode(void)
 		/* clear new region */
 		memset(&nodes[ncapnodes], 0, sizeof(*nodes) * NODE_CAP_INC);
 		memset(&nodes_links[ncapnodes], 0, sizeof(*nodes_links) * NODE_CAP_INC);
+
+		for (i = ncapnodes; i < ncapnodes + NODE_CAP_INC; i++) {
+			nodes[i].tag.displaytype = DisplayInline;
+			nodes[i].tag.name = nodes[i].tagname; /* assign to use fixed-size buffer */
+		}
 
 		ncapnodes += NODE_CAP_INC; /* greedy alloc */
 	}
@@ -1987,8 +1994,6 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	cur = &nodes[curnode];
 	memset(cur, 0, sizeof(*cur)); /* clear / reset node */
 	/* tag defaults */
-	cur->tag.displaytype = DisplayInline;
-	cur->tag.name = cur->tagname; /* assign fixed-size buffer */
 	strlcpy(cur->tagname, t, sizeof(cur->tagname));
 
 	/* force to lowercase */
@@ -2415,9 +2420,6 @@ main(int argc, char **argv)
 	ncapnodes = NODE_CAP_INC;
 	nodes = ecalloc(ncapnodes, sizeof(*nodes));
 	nodes_links = ecalloc(ncapnodes, sizeof(*nodes_links));
-
-	/* top-most document root needs initialization */
-	nodes[0].tag.name = "";
 
 	parser.xmlattrstart = xmlattrstart;
 	parser.xmlattr = xmlattr;
