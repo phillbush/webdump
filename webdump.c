@@ -1988,8 +1988,9 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	memset(cur, 0, sizeof(*cur)); /* clear / reset node */
 	/* tag defaults */
 	cur->tag.displaytype = DisplayInline;
-	cur->tag.name = cur->tagname;
+	cur->tag.name = cur->tagname; /* assign fixed-size buffer */
 	strlcpy(cur->tagname, t, sizeof(cur->tagname));
+
 	/* force to lowercase */
 	for (s = cur->tagname; *s; s++)
 		*s = TOLOWER((unsigned char)*s);
@@ -1998,7 +1999,7 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	if (found)
 		memcpy(&(cur->tag), found, sizeof(*found));
 
-	/* parent tag is hidden, so hide ourself too */
+	/* if parent tag is hidden then hide itself too */
 	if (curnode > 0 && (nodes[curnode - 1].tag.displaytype & DisplayNone))
 		cur->tag.displaytype |= DisplayNone;
 }
