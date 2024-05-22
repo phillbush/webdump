@@ -1835,7 +1835,7 @@ xmltagend(XMLParser *p, const char *t, size_t tl, int isshort)
 		   for handling optional closing tags */
 		tag = NULL;
 		for (i = curnode; i >= 0; i--) {
-			if (nodes[curnode].tag.name &&
+			if (nodes[i].tag.name &&
 			    !tagcmp(nodes[i].tag.name, t)) {
 				endnode(&nodes[i]);
 				curnode = i > 0 ? i - 1 : 0;
