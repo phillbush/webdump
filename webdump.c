@@ -1994,6 +1994,8 @@ xmltagstart(XMLParser *p, const char *t, size_t tl)
 	cur = &nodes[curnode];
 	memset(cur, 0, sizeof(*cur)); /* clear / reset node */
 	/* tag defaults */
+	cur->tag.displaytype = DisplayInline;
+	cur->tag.name = cur->tagname; /* assign fixed-size buffer */
 	strlcpy(cur->tagname, t, sizeof(cur->tagname));
 
 	/* force to lowercase */
