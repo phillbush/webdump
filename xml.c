@@ -386,6 +386,8 @@ xml_parse(XMLParser *x)
 					else if (c == '>' || ISSPACE(c)) {
 						x->tag[x->taglen] = '\0';
 						if (isend) { /* end tag, starts with </ */
+							while (c != '>' && c != EOF) /* skip until > */
+								c = GETNEXT();
 							if (x->xmltagend)
 								x->xmltagend(x, x->tag, x->taglen, x->isshorttag);
 							x->tag[0] = '\0';
