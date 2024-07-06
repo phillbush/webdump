@@ -1420,15 +1420,17 @@ addlinkref(const char *url, const char *_type, enum TagId tagid, int ishidden)
 
 	if (!ishidden) {
 		linknr = ++nvisrefs;
-		if (nvisrefs >= ncapvisrefs)
+		if (nvisrefs >= ncapvisrefs) {
 			ncapvisrefs += 256; /* greedy alloc */
-		visrefs = erealloc(visrefs, sizeof(*visrefs) * ncapvisrefs);
+			visrefs = erealloc(visrefs, sizeof(*visrefs) * ncapvisrefs);
+		}
 		visrefs[linknr - 1] = link; /* add pointer to list */
 	} else {
 		linknr = ++nhiddenrefs;
-		if (nhiddenrefs >= ncaphiddenrefs)
+		if (nhiddenrefs >= ncaphiddenrefs) {
 			ncaphiddenrefs += 256; /* greedy alloc */
-		hiddenrefs = erealloc(hiddenrefs, sizeof(*hiddenrefs) * ncaphiddenrefs);
+			hiddenrefs = erealloc(hiddenrefs, sizeof(*hiddenrefs) * ncaphiddenrefs);
+		}
 		hiddenrefs[linknr - 1] = link; /* add pointer to list */
 	}
 
@@ -1534,7 +1536,7 @@ printlinkrefs(void)
 }
 
 /* size to grow node capacity (greedy) */
-#define NODE_CAP_INC 256
+#define NODE_CAP_INC 16
 
 /* increase node depth, allocate space for nodes if needed */
 static void
