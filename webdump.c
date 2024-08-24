@@ -46,10 +46,10 @@ struct uri {
 
 /* options */
 static int allowansi     = 0;  /* (-a) allow ANSI escape codes */
-static int uniqrefs      = 0;  /* (-d) number unique references */
-static int showrefinline = 0;  /* (-i) show link reference number inline */
+static int uniqrefs      = 1;  /* (-d) number unique references */
+static int showrefinline = 1;  /* (-i) show link reference number inline */
 static int showurlinline = 0;  /* (-I) show full link reference inline */
-static int showrefbottom = 0;  /* (-l) show link references at the bottom */
+static int showrefbottom = 1;  /* (-l) show link references at the bottom */
 static int allowlinewrap = 0;  /* (-r) line-wrapping */
 static int termwidth     = 77; /* (-w) terminal width */
 static int resources     = 0;  /* (-x) write resources line-by-line to fd 3? */
@@ -179,10 +179,11 @@ linkrefcmp(struct linkref *r1, struct linkref *r2)
 RB_HEAD(linkreftree, linkref) linkrefhead = RB_INITIALIZER(&linkrefhead);
 RB_GENERATE(linkreftree, linkref, entry, linkrefcmp)
 
-static const char *str_bullet_item = "* ";
-static const char *str_checkbox_checked = "x";
-static const char *str_ruler = "-";
-static const char *str_radio_checked = "*";
+static const char *str_section_symbol = "§";
+static const char *str_bullet_item = "• ";
+static const char *str_checkbox_checked = "✕";
+static const char *str_ruler = "─";
+static const char *str_radio_checked = "✓";
 
 /* base href, to make URLs absolute */
 static char basehrefdoc[4096]; /* buffer for base href in document, if any */
@@ -216,7 +217,7 @@ static int ncells; /* current cell/column count */
 static int hadnewline; /* count for repeated newlines */
 /* flag for skipping initial white-space in tag: for HTML white-space handling */
 static int skipinitialws = 1;
-#define DEFAULT_INDENT 2
+#define DEFAULT_INDENT 0
 static const int defaultindent = DEFAULT_INDENT; /* default indent / margin */
 static int indent; /* indent for the current line, in columns */
 /* previous output sequential newlines, used for calculating margins between
@@ -258,7 +259,7 @@ static struct tag tags[] = {
 { "b",          TagB,          DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
 { "base",       TagBase,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "blink",      TagBlink,      DisplayInline,                    MarkupBlink,     0,               0, 0, 0, 0, 0 },
-{ "blockquote", TagBlockquote, DisplayBlock,                     0,               0,               0, 0, 0, 0, 2 },
+{ "blockquote", TagBlockquote, DisplayBlock,                     0,               0,               0, 0, 0, 0, 8 },
 { "body",       TagBody,       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "br",         TagBr,         0,                                0,               0,               1, 0, 0, 0, 0 },
 { "button",     TagButton,     DisplayInline | DisplayButton,    0,               0,               0, 0, 0, 0, 0 },
@@ -266,11 +267,11 @@ static struct tag tags[] = {
 { "col",        TagCol,        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "colgroup",   TagColgroup,   DisplayInline,                    0,               0,               0, 1, 0, 0, 0 },
 { "datalist",   TagDatalist,   DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
-{ "dd",         TagDd,         DisplayBlock,                     0,               0,               0, 1, 0, 0, 4 },
+{ "dd",         TagDd,         DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
 { "del",        TagDel,        DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
 { "details",    TagDetails,    DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "dfn",        TagDfn,        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
-{ "dir",        TagDir,        DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "dir",        TagDir,        DisplayList,                      0,               0,               0, 0, 1, 1, 0 },
 { "div",        TagDiv,        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "dl",         TagDl,         DisplayBlock | DisplayDl,         0,               0,               0, 0, 0, 0, 0 },
 { "dt",         TagDt,         DisplayBlock,                     MarkupBold,      0,               0, 1, 0, 0, 0 },
@@ -278,16 +279,16 @@ static struct tag tags[] = {
 { "embed",      TagEmbed,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "fieldset",   TagFieldset,   DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "figcaption", TagFigcaption, DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
-{ "figure",     TagFigure,     DisplayBlock,                     0,               0,               0, 0, 1, 1, 4 },
+{ "figure",     TagFigure,     DisplayBlock,                     0,               0,               0, 0, 1, 1, 0 },
 { "footer",     TagFooter,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "form",       TagForm,       DisplayBlock,                     0,               0,               0, 0, 0, 1, 0 },
 { "frame",      TagFrame,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "h1",         TagH1,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h2",         TagH2,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h3",         TagH3,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h4",         TagH4,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h5",         TagH5,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
-{ "h6",         TagH6,         DisplayHeader,                    MarkupBold,      0,               0, 0, 1, 1, -DEFAULT_INDENT },
+{ "h1",         TagH1,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
+{ "h2",         TagH2,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
+{ "h3",         TagH3,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
+{ "h4",         TagH4,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
+{ "h5",         TagH5,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
+{ "h6",         TagH6,         DisplayHeader,                    MarkupBold,      0,               0, 0, 2, 1, 0 },
 { "head",       TagHead,       DisplayBlock,                     0,               0,               0, 1, 0, 0, 0 },
 { "header",     TagHeader,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "hr",         TagHr,         DisplayBlock,                     0,               0,               1, 0, 0, 0, 0 },
@@ -303,7 +304,7 @@ static struct tag tags[] = {
 { "link",       TagLink,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "main",       TagMain,       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "mark",       TagMark,       DisplayInline,                    MarkupReverse,   0,               0, 0, 0, 0, 0 },
-{ "menu",       TagMenu,       DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "menu",       TagMenu,       DisplayList,                      0,               0,               0, 0, 1, 1, 0 },
 { "meta",       TagMeta,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "nav",        TagNav,        DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "object",     TagObject,     DisplayInline,                    0,               0,               0, 0, 0, 0, 0 },
@@ -311,7 +312,7 @@ static struct tag tags[] = {
 { "option",     TagOption,     DisplayInline | DisplayOption,    0,               0,               0, 1, 0, 0, 0 },
 { "p",          TagP,          DisplayBlock,                     0,               0,               0, 1, 1, 1, 0 },
 { "param",      TagParam,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "pre",        TagPre,        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 },
+{ "pre",        TagPre,        DisplayPre,                       0,               0,               0, 0, 1, 1, 8 },
 { "s",          TagS,          DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
 { "script",     TagScript,     DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
 { "search",     TagSearch,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
@@ -331,15 +332,15 @@ static struct tag tags[] = {
 { "tfoot",      TagTfoot,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
 { "th",         TagTh,         DisplayTableCell,                 MarkupBold,      DisplayTableRow, 0, 1, 0, 0, 0 },
 { "thead",      TagThead,      DisplayInline,                    0,               DisplayTable,    0, 1, 0, 0, 0 },
-{ "title",      TagTitle,      DisplayBlock,                     0,               0,               0, 0, 0, 1, -DEFAULT_INDENT },
+{ "title",      TagTitle,      DisplayBlock,                     0,               0,               0, 0, 0, 1, 0 },
 { "tr",         TagTr,         DisplayTableRow,                  0,               DisplayTable,    0, 1, 0, 0, 0 },
 { "track",      TagTrack,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "u",          TagU,          DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
-{ "ul",         TagUl,         DisplayList,                      0,               0,               0, 0, 1, 1, 2 },
+{ "ul",         TagUl,         DisplayList,                      0,               0,               0, 0, 1, 1, 0 },
 { "var",        TagVar,        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "video",      TagVideo,      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
 { "wbr",        TagWbr,        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "xmp",        TagXmp,        DisplayPre,                       0,               0,               0, 0, 1, 1, 4 }
+{ "xmp",        TagXmp,        DisplayPre,                       0,               0,               0, 0, 1, 1, 8 }
 };
 
 /* hint for compilers and static analyzers that a function exits */
@@ -708,7 +709,9 @@ rindent(void)
 	total = indent + defaultindent;
 	if (total < 0)
 		total = 0;
-	for (i = 0; i < total; i++)
+	for (i = 0; i < total; i += 8)
+		putchar('\t');
+	for (i = total % 8; i < total; i++)
 		putchar(' ');
 
 	nbytesline += total;
@@ -1519,11 +1522,11 @@ printlinkrefs(void)
 		}
 	}
 
-	printf("\nReferences\n\n");
+	printf("\n§ References\n\n");
 
 	for (i = 0; i < nvisrefs; i++) {
 		ref = visrefs[i];
-		printf(" %zu. %s (%s)\n", ref->linknr, ref->url, ref->type);
+		printf("• (%zu) %s (%s)\n", ref->linknr, ref->url, ref->type);
 	}
 
 	if (nhiddenrefs > 0)
@@ -1531,7 +1534,7 @@ printlinkrefs(void)
 	/* hidden links don't have a link number, just count them */
 	for (i = 0; i < nhiddenrefs; i++) {
 		ref = hiddenrefs[i];
-		printf(" %zu. %s (%s)\n", ref->linknr, ref->url, ref->type);
+		printf("• (%zu) %s (%s)\n", ref->linknr, ref->url, ref->type);
 	}
 }
 
@@ -2160,7 +2163,7 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 
 			/* print bullet, add columns to indentation level */
 			if (parent->tag.displaytype & DisplayListOrdered) {
-				hprintf("%4zu. ", parent->nchildren);
+				hprintf("• (%zu) ", parent->nchildren);
 				cur->indent = 6;
 				indent += cur->indent; /* align to number */
 			} else if (parent->tag.displaytype & DisplayList) {
@@ -2192,6 +2195,28 @@ xmltagstartparsed(XMLParser *p, const char *t, size_t tl, int isshort)
 		} else {
 			/* unrecognized / default case is text */
 			hprintf("[%-15s]", attr_value.len ? attr_value.data : "");
+		}
+	} else if (cur->tag.displaytype & DisplayHeader) {
+		hflush();
+		switch (cur->tag.id) {
+		case TagH6:
+			hprint(str_section_symbol);
+			/* fallthrought */
+		case TagH5:
+			hprint(str_section_symbol);
+			/* fallthrought */
+		case TagH4:
+			hprint(str_section_symbol);
+			/* fallthrought */
+		case TagH3:
+			hprint(str_section_symbol);
+			/* fallthrought */
+		case TagH2:
+			hprint(str_section_symbol);
+			hputchar(' ');
+			/* fallthrought */
+		default:
+			break;
 		}
 	}
 
