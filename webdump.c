@@ -1474,6 +1474,8 @@ handleinlinelink(void)
 
 	if (!url)
 		return;
+	if (*url == '#')
+		return;         /* ignore self-page links */
 
 	/* Not an absolute URL yet: try to make it absolute.
 	   If it is not possible use the relative URL */
