@@ -50,8 +50,8 @@ static int uniqrefs      = 1;  /* (-d) number unique references */
 static int showrefinline = 1;  /* (-i) show link reference number inline */
 static int showurlinline = 0;  /* (-I) show full link reference inline */
 static int showrefbottom = 1;  /* (-l) show link references at the bottom */
-static int allowlinewrap = 0;  /* (-r) line-wrapping */
-static int termwidth     = 77; /* (-w) terminal width */
+static int allowlinewrap = 1;  /* (-r) line-wrapping */
+static int termwidth     = 72; /* (-w) terminal width */
 static int resources     = 0;  /* (-x) write resources line-by-line to fd 3? */
 
 enum DisplayType {
@@ -218,6 +218,7 @@ static int hadnewline; /* count for repeated newlines */
 /* flag for skipping initial white-space in tag: for HTML white-space handling */
 static int skipinitialws = 1;
 #define DEFAULT_INDENT 0
+#define DEFAULT_TABSTOP 8
 static const int defaultindent = DEFAULT_INDENT; /* default indent / margin */
 static int indent; /* indent for the current line, in columns */
 /* previous output sequential newlines, used for calculating margins between
@@ -259,7 +260,7 @@ static struct tag tags[] = {
 { "b",          TagB,          DisplayInline,                    MarkupBold,      0,               0, 0, 0, 0, 0 },
 { "base",       TagBase,       DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
 { "blink",      TagBlink,      DisplayInline,                    MarkupBlink,     0,               0, 0, 0, 0, 0 },
-{ "blockquote", TagBlockquote, DisplayBlock,                     0,               0,               0, 0, 0, 0, 8 },
+{ "blockquote", TagBlockquote, DisplayBlock,                     0,               0,               0, 0, 0, 0, DEFAULT_TABSTOP },
 { "body",       TagBody,       DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
 { "br",         TagBr,         0,                                0,               0,               1, 0, 0, 0, 0 },
 { "button",     TagButton,     DisplayInline | DisplayButton,    0,               0,               0, 0, 0, 0, 0 },
@@ -312,7 +313,7 @@ static struct tag tags[] = {
 { "option",     TagOption,     DisplayInline | DisplayOption,    0,               0,               0, 1, 0, 0, 0 },
 { "p",          TagP,          DisplayBlock,                     0,               0,               0, 1, 1, 1, 0 },
 { "param",      TagParam,      DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "pre",        TagPre,        DisplayPre,                       0,               0,               0, 0, 1, 1, 8 },
+{ "pre",        TagPre,        DisplayPre,                       0,               0,               0, 0, 1, 1, DEFAULT_TABSTOP },
 { "s",          TagS,          DisplayInline,                    MarkupStrike,    0,               0, 0, 0, 0, 0 },
 { "script",     TagScript,     DisplayNone,                      0,               0,               0, 0, 0, 0, 0 },
 { "search",     TagSearch,     DisplayBlock,                     0,               0,               0, 0, 0, 0, 0 },
@@ -340,7 +341,7 @@ static struct tag tags[] = {
 { "var",        TagVar,        DisplayInline,                    MarkupItalic,    0,               0, 0, 0, 0, 0 },
 { "video",      TagVideo,      DisplayInline,                    MarkupUnderline, 0,               0, 0, 0, 0, 0 },
 { "wbr",        TagWbr,        DisplayInline,                    0,               0,               1, 0, 0, 0, 0 },
-{ "xmp",        TagXmp,        DisplayPre,                       0,               0,               0, 0, 1, 1, 8 }
+{ "xmp",        TagXmp,        DisplayPre,                       0,               0,               0, 0, 1, 1, DEFAULT_TABSTOP }
 };
 
 /* hint for compilers and static analyzers that a function exits */
@@ -709,9 +710,9 @@ rindent(void)
 	total = indent + defaultindent;
 	if (total < 0)
 		total = 0;
-	for (i = 0; i < total; i += 8)
+	for (i = 0; i < total / DEFAULT_TABSTOP; i++)
 		putchar('\t');
-	for (i = total % 8; i < total; i++)
+	for (i = 0; i < total % DEFAULT_TABSTOP; i++)
 		putchar(' ');
 
 	nbytesline += total;
@@ -862,7 +863,7 @@ utfwidth(int c)
 		return 0;
 	/* count TAB as 8 */
 	if (c == '\t')
-		return 8;
+		return DEFAULT_TABSTOP;
 	return 1;
 }
 
@@ -1098,8 +1099,8 @@ printpre(const char *s, size_t len)
 
 			/* TAB to 8 spaces */
 			fputs("        ", stdout);
-			nbytesline += 8;
-			ncells += 8;
+			nbytesline += DEFAULT_TABSTOP;
+			ncells += DEFAULT_TABSTOP;
 			break;
 		default:
 			if (ISCNTRL((unsigned char)*s))
